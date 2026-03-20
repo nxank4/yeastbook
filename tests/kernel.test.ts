@@ -54,6 +54,11 @@ describe("executeCode", () => {
     expect(result.value).toBeUndefined();
   });
 
+  test("handles trailing semicolons on expressions", async () => {
+    const result = await executeCode("1 + 2;", {});
+    expect(result.value).toBe(3);
+  });
+
   test("handles multiline code with last expression", async () => {
     const result = await executeCode("const a = 10\nconst b = 20\na + b", {});
     expect(result.value).toBe(30);

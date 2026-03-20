@@ -40,7 +40,7 @@ function wrapCode(code: string): string {
 
   const lastLine = lines[lastIdx]!;
   if (shouldReturnLastLine(lastLine)) {
-    lines[lastIdx] = `return (${lastLine.trim()})`;
+    lines[lastIdx] = `return (${lastLine.trim().replace(/;$/, "")})`;
   }
   return lines.join("\n");
 }
