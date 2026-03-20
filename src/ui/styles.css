@@ -1,0 +1,159 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: #FAFAF8;
+  color: #1a1a1a;
+  line-height: 1.6;
+}
+
+.toolbar {
+  position: sticky; top: 0; z-index: 10;
+  background: #FAFAF8; border-bottom: 1px solid #e5e2dd;
+  padding: 12px 24px;
+  display: flex; align-items: center; gap: 16px;
+}
+
+.toolbar h1 {
+  font-size: 18px; font-weight: 600; color: #44403c;
+  letter-spacing: -0.01em;
+}
+
+.toolbar .status {
+  font-size: 13px; color: #a8a29e;
+  margin-left: auto;
+}
+
+.toolbar .status.connected { color: #16a34a; }
+
+.notebook {
+  max-width: 900px; margin: 0 auto;
+  padding: 24px 24px 120px;
+}
+
+/* --- Cell --- */
+.cell {
+  position: relative;
+  margin-bottom: 12px;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.cell:hover, .cell:focus-within {
+  border-color: #D97706;
+  box-shadow: 0 2px 8px rgba(217,119,6,0.08);
+}
+
+.cell-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 12px;
+  border-bottom: 1px solid #f3f1ee;
+  font-size: 12px; color: #a8a29e;
+}
+
+.exec-count {
+  font-family: 'JetBrains Mono', monospace;
+  min-width: 36px;
+}
+
+.cell-type {
+  text-transform: uppercase; letter-spacing: 0.05em; font-weight: 500;
+}
+
+.cell-actions {
+  margin-left: auto; display: flex; gap: 4px;
+}
+
+.cell-actions button {
+  background: none; border: none; cursor: pointer;
+  padding: 2px 6px; border-radius: 4px;
+  font-size: 12px; color: #a8a29e;
+  transition: background 0.1s, color 0.1s;
+}
+
+.cell-actions button:hover { background: #f5f3f0; color: #44403c; }
+
+.run-btn { color: #D97706 !important; font-weight: 600; }
+.run-btn:hover { background: #FEF3C7 !important; }
+
+/* --- Code area --- */
+.code-area textarea {
+  width: 100%; border: none; outline: none; resize: none;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px; line-height: 1.6;
+  padding: 12px 16px;
+  background: transparent; color: #1a1a1a;
+  min-height: 42px;
+  border-radius: 0 0 10px 10px;
+  display: block;
+}
+
+/* --- Output --- */
+.output-area {
+  border-top: 1px solid #f3f1ee;
+  padding: 10px 16px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px; line-height: 1.5;
+  white-space: pre-wrap; word-break: break-word;
+}
+
+.output-area:empty { display: none; }
+
+.output-stdout { color: #1a1a1a; }
+.output-stderr { color: #DC2626; }
+.output-result { color: #0369a1; }
+.output-error { color: #DC2626; }
+.output-error .traceback { font-size: 12px; color: #9a3412; margin-top: 4px; }
+
+/* --- Markdown --- */
+.markdown-rendered {
+  padding: 12px 16px;
+  cursor: pointer;
+}
+
+.markdown-rendered h1 { font-size: 28px; font-weight: 600; margin: 8px 0; color: #1a1a1a; }
+.markdown-rendered h2 { font-size: 22px; font-weight: 600; margin: 8px 0; color: #292524; }
+.markdown-rendered h3 { font-size: 18px; font-weight: 600; margin: 6px 0; color: #44403c; }
+.markdown-rendered p { margin: 6px 0; }
+.markdown-rendered code {
+  font-family: 'JetBrains Mono', monospace; font-size: 13px;
+  background: #f5f3f0; padding: 2px 5px; border-radius: 4px;
+}
+.markdown-rendered pre { background: #f5f3f0; padding: 12px; border-radius: 6px; overflow-x: auto; }
+.markdown-rendered pre code { background: none; padding: 0; }
+.markdown-rendered ul, .markdown-rendered ol { padding-left: 24px; margin: 6px 0; }
+.markdown-rendered blockquote {
+  border-left: 3px solid #D97706; padding-left: 12px;
+  color: #78716c; margin: 8px 0;
+}
+
+/* --- Add cell bar --- */
+.add-cell-bar {
+  display: flex; justify-content: center; gap: 8px;
+  padding: 16px 0;
+}
+
+.add-cell-bar button {
+  background: #f5f3f0; border: 1px solid #e5e2dd;
+  padding: 8px 20px; border-radius: 8px;
+  font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 500;
+  color: #44403c; cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.add-cell-bar button:hover {
+  background: #FEF3C7; border-color: #D97706;
+}
+
+/* --- Busy indicator --- */
+.busy-indicator {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; background: #D97706;
+  animation: pulse 1s ease-in-out infinite;
+  margin-right: 4px;
+}
+
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }

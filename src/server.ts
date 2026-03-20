@@ -22,7 +22,7 @@ export async function startServer(filePath: string, port: number = 3000) {
     context: {},
   };
 
-  const htmlPath = resolve(import.meta.dirname!, "ui/notebook.html");
+  const distDir = resolve(import.meta.dirname!, "../dist");
 
   const server = Bun.serve({
     port,
@@ -32,11 +32,17 @@ export async function startServer(filePath: string, port: number = 3000) {
         if (server.upgrade(req)) return;
         return new Response("WebSocket upgrade failed", { status: 400 });
       }
+      // Serve static files from dist/
+      if (url.pathname !== "/" && !url.pathname.startsWith("/api/")) {
+        const filePath = resolve(distDir, url.pathname.slice(1));
+        const file = Bun.file(filePath);
+        return new Response(file);
+      }
       return undefined;
     },
     routes: {
       "/": async () => {
-        const html = await Bun.file(htmlPath).text();
+        const html = await Bun.file(resolve(distDir, "index.html")).text();
         return new Response(html, {
           headers: { "Content-Type": "text/html; charset=utf-8" },
         });
@@ -73,7 +79,7 @@ export async function startServer(filePath: string, port: number = 3000) {
       },
     },
     websocket: {
-      open(ws) {},
+      open() {},
       async message(ws, message) {
         const msg = JSON.parse(message as string) as
           | { type: "execute"; cellId: string; code: string }
