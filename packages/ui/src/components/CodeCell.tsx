@@ -30,6 +30,9 @@ export function CodeCell({
   const editorRef = useRef<any>(null);
   const monacoRef = useRef<any>(null);
   const [editorHeight, setEditorHeight] = useState(60);
+  const [aiPromptOpen, setAiPromptOpen] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
   const sourceRef = useRef(cell.source.join("\n"));
   // Refs for callbacks to avoid stale closures in Monaco commands
   const onRunRef = useRef(onRun);
@@ -98,6 +101,48 @@ export function CodeCell({
 
   useEffect(() => { updateHeight(); }, [updateHeight]);
 
+  const handleAiGenerate = useCallback(async () => {
+    if (!aiPrompt.trim()) return;
+    setAiLoading(true);
+    try {
+      const res = await fetch("/api/ai/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: aiPrompt, context: [], mode: "generate" }),
+      });
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let code = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (line.startsWith("data: ") && line !== "data: [DONE]") {
+            try {
+              const parsed = JSON.parse(line.slice(6));
+              if (parsed.text) {
+                code += parsed.text;
+                editorRef.current?.setValue(code);
+              }
+            } catch {}
+          }
+        }
+      }
+      sourceRef.current = code;
+      onSourceChange(cell.id, code);
+    } catch (e) {
+      console.error("AI generation failed:", e);
+    } finally {
+      setAiLoading(false);
+      setAiPromptOpen(false);
+      setAiPrompt("");
+    }
+  }, [aiPrompt, cell.id, onSourceChange]);
+
   const displayOutputs = liveOutputs.length > 0 ? liveOutputs : cell.outputs;
 
   return (
@@ -114,10 +159,27 @@ export function CodeCell({
           <button className="run-btn" onClick={(e) => { e.stopPropagation(); onRun(cell.id, sourceRef.current); }} title="Run cell">
             <i className="bi bi-play-fill" />
           </button>
+          <button onClick={(e) => { e.stopPropagation(); setAiPromptOpen(!aiPromptOpen); }} title="Ask AI"><i className="bi bi-stars" /></button>
           <button onClick={(e) => { e.stopPropagation(); onClear(cell.id); }} title="Clear output"><i className="bi bi-eraser" /></button>
           <button onClick={(e) => { e.stopPropagation(); onDelete(cell.id); }} title="Delete cell"><i className="bi bi-trash3" /></button>
         </div>
       </div>
+      {aiPromptOpen && (
+        <div className="ai-prompt-bar">
+          <input
+            type="text"
+            value={aiPrompt}
+            onChange={(e) => setAiPrompt(e.target.value)}
+            placeholder="What should this code do?"
+            className="ai-prompt-input"
+            onKeyDown={(e) => { if (e.key === "Enter") handleAiGenerate(); if (e.key === "Escape") setAiPromptOpen(false); }}
+          />
+          <button onClick={handleAiGenerate} disabled={aiLoading} className="ai-generate-btn">
+            {aiLoading ? "Generating..." : "Generate"}
+          </button>
+          <button onClick={() => setAiPromptOpen(false)} className="ai-cancel-btn">Cancel</button>
+        </div>
+      )}
       {installing && !installing.done && (
         <div className="install-progress">
           <div className="install-header">

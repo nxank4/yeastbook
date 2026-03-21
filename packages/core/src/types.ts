@@ -53,12 +53,17 @@ export interface Settings {
     autoSaveOnRun: boolean;
     clearOutputBeforeRun: boolean;
   };
+  ai: {
+    provider: "anthropic" | "openai" | "disabled";
+    apiKey: string;
+  };
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   editor: { fontSize: 13, tabSize: 2, wordWrap: false },
   appearance: { theme: "light" },
   execution: { autoSaveOnRun: true, clearOutputBeforeRun: false },
+  ai: { provider: "disabled", apiKey: "" },
 };
 
 export type WsOutgoing =

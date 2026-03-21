@@ -18,6 +18,7 @@ export function SettingsPanel({ open, settings, version, bunVersion, fileFormat,
         editor: { ...settings.editor, ...patch.editor },
         appearance: { ...settings.appearance, ...patch.appearance },
         execution: { ...settings.execution, ...patch.execution },
+        ai: { ...settings.ai, ...patch.ai },
       };
       onUpdate(next);
     },
@@ -118,6 +119,34 @@ export function SettingsPanel({ open, settings, version, bunVersion, fileFormat,
                 <span className="toggle-knob" />
               </button>
             </label>
+          </section>
+
+          <section className="settings-section">
+            <h3><i className="bi bi-stars" /> AI Assistant</h3>
+            <div className="settings-row">
+              <span>Provider</span>
+              <select
+                value={settings.ai?.provider ?? "disabled"}
+                onChange={(e) => onUpdate({ ...settings, ai: { ...settings.ai, provider: e.target.value as any } })}
+              >
+                <option value="disabled">Disabled</option>
+                <option value="anthropic">Claude (Anthropic)</option>
+                <option value="openai">OpenAI</option>
+              </select>
+            </div>
+            {settings.ai?.provider !== "disabled" && (
+              <div className="settings-row">
+                <span>API Key</span>
+                <input
+                  type="password"
+                  value={settings.ai?.apiKey ?? ""}
+                  onChange={(e) => onUpdate({ ...settings, ai: { ...settings.ai, apiKey: e.target.value } })}
+                  placeholder="sk-..."
+                  className="widget-text-input"
+                  style={{ width: 200 }}
+                />
+              </div>
+            )}
           </section>
 
           <section className="settings-section">

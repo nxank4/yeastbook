@@ -27,6 +27,7 @@ async function loadSettings(): Promise<Settings> {
         editor: { ...DEFAULT_SETTINGS.editor, ...data.editor },
         appearance: { ...DEFAULT_SETTINGS.appearance, ...data.appearance },
         execution: { ...DEFAULT_SETTINGS.execution, ...data.execution },
+        ai: { ...DEFAULT_SETTINGS.ai, ...data.ai },
       };
     }
   } catch {}
@@ -272,6 +273,36 @@ export async function startServer(filePath: string, port: number = 3000) {
           return Response.json({ id });
         },
       },
+      "/api/ai/generate": {
+        POST: async (req) => {
+          const body = await req.json() as { prompt: string; context: string[]; mode: "generate" | "fix"; code?: string; error?: string };
+          const aiSettings = settings.ai;
+          if (!aiSettings || aiSettings.provider === "disabled" || !aiSettings.apiKey) {
+            return new Response("AI not configured", { status: 400 });
+          }
+          const { buildPrompt, buildFixPrompt, streamAI } = await import("./ai.ts");
+          const { system, user } = body.mode === "fix"
+            ? buildFixPrompt(body.code ?? "", body.error ?? "")
+            : buildPrompt(body.prompt, body.context);
+
+          const stream = new ReadableStream({
+            async start(controller) {
+              try {
+                for await (const chunk of streamAI(aiSettings.provider as any, aiSettings.apiKey, system, user)) {
+                  controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ text: chunk })}\n\n`));
+                }
+                controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
+              } catch (e) {
+                controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ error: String(e) })}\n\n`));
+              }
+              controller.close();
+            },
+          });
+          return new Response(stream, {
+            headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
+          });
+        },
+      },
       "/api/settings": {
         GET: async () => {
           const pkg = await Bun.file(resolve(import.meta.dirname!, "../package.json")).json();
@@ -286,6 +317,7 @@ export async function startServer(filePath: string, port: number = 3000) {
           Object.assign(settings.editor, body.editor);
           Object.assign(settings.appearance, body.appearance);
           Object.assign(settings.execution, body.execution);
+          Object.assign(settings.ai, body.ai);
           await saveSettings(settings);
           const pkg = await Bun.file(resolve(import.meta.dirname!, "../package.json")).json();
           return Response.json({
