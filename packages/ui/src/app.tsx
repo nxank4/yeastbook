@@ -223,6 +223,10 @@ export function App() {
           if (data.fileFormat) setFileFormat(data.fileFormat);
         });
         break;
+      case "auto_saved":
+        setSaved(true);
+        showToast("Auto-saved");
+        break;
     }
   }, [showToast]);
 

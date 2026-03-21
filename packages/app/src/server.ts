@@ -73,6 +73,21 @@ export async function startServer(filePath: string, port: number = 3000) {
   const clients = new Set<any>();
   const ownWriteMarker = createOwnWriteMarker();
 
+  let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function scheduleAutoSave() {
+    if (autoSaveTimer) clearTimeout(autoSaveTimer);
+    autoSaveTimer = setTimeout(async () => {
+      try {
+        ownWriteMarker.mark();
+        await state.notebook.save(state.filePath);
+        for (const c of clients) {
+          try { c.send(JSON.stringify({ type: "auto_saved" })); } catch {}
+        }
+      } catch {}
+    }, 30_000);
+  }
+
   const stopWatcher = watchNotebook(absPath, async () => {
     try {
       const updated = await Notebook.load(state.filePath);
@@ -144,6 +159,7 @@ export async function startServer(filePath: string, port: number = 3000) {
           const id = state.notebook.addCell(body.type, body.source ?? "");
           ownWriteMarker.mark();
           await state.notebook.save(state.filePath);
+          scheduleAutoSave();
           return Response.json({ id });
         },
       },
@@ -152,6 +168,7 @@ export async function startServer(filePath: string, port: number = 3000) {
           state.notebook.deleteCell(req.params.id);
           ownWriteMarker.mark();
           await state.notebook.save(state.filePath);
+          scheduleAutoSave();
           return Response.json({ ok: true });
         },
         PATCH: async (req) => {
@@ -159,6 +176,7 @@ export async function startServer(filePath: string, port: number = 3000) {
           state.notebook.updateCellSource(req.params.id, body.source);
           ownWriteMarker.mark();
           await state.notebook.save(state.filePath);
+          scheduleAutoSave();
           return Response.json({ ok: true });
         },
       },
@@ -168,6 +186,7 @@ export async function startServer(filePath: string, port: number = 3000) {
           state.notebook.moveCell(req.params.id, body.direction);
           ownWriteMarker.mark();
           await state.notebook.save(state.filePath);
+          scheduleAutoSave();
           return Response.json({ ok: true });
         },
       },
@@ -197,6 +216,7 @@ export async function startServer(filePath: string, port: number = 3000) {
         POST: async () => {
           ownWriteMarker.mark();
           await state.notebook.save(state.filePath);
+          scheduleAutoSave();
           return Response.json({ ok: true });
         },
       },
@@ -248,6 +268,7 @@ export async function startServer(filePath: string, port: number = 3000) {
           const id = state.notebook.insertCellAfter(body.type, body.source ?? "", body.afterId);
           ownWriteMarker.mark();
           await state.notebook.save(state.filePath);
+          scheduleAutoSave();
           return Response.json({ id });
         },
       },
@@ -429,12 +450,14 @@ export async function startServer(filePath: string, port: number = 3000) {
               }));
               ownWriteMarker.mark();
               await state.notebook.save(state.filePath);
+              scheduleAutoSave();
             } else if (magic.length > 0) {
               // Magic-only cell: update source but send idle status
               state.notebook.updateCellSource(msg.cellId, msg.code);
               ws.send(JSON.stringify({ type: "status", cellId: msg.cellId, status: "idle" }));
               ownWriteMarker.mark();
               await state.notebook.save(state.filePath);
+              scheduleAutoSave();
             }
           }
         } catch (err) {
