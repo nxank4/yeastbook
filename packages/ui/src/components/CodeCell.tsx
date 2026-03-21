@@ -215,7 +215,7 @@ export function CodeCell({
           height={editorHeight}
           defaultLanguage="typescript"
           defaultValue={cell.source.join("\n") || ""}
-          theme={theme === "dark" ? "vs-dark" : "vs"}
+          theme="vs-dark"
           onMount={handleEditorMount}
           options={{
             minimap: { enabled: false },

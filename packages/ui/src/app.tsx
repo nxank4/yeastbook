@@ -635,9 +635,11 @@ export function App() {
   return (
     <>
       <div className="toolbar">
+        <span className="toolbar-logo">🍞 yeastbook</span>
         <EditableFileName fileName={fileName} onRename={handleRename} />
         <div className={`status ${connected ? "connected" : ""}`}>
-          <i className={`bi ${connected ? "bi-wifi" : "bi-wifi-off"}`} /> {connected ? "ready" : "connecting..."}
+          <span className={`status-dot ${connected ? "connected" : ""}`} />
+          {connected ? "Connected" : "Disconnected"}
         </div>
       </div>
       <MenuBar
