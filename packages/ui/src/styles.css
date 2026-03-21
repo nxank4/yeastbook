@@ -811,3 +811,34 @@ input, textarea, select {
   padding: 16px; text-align: center;
   color: var(--text-faint); font-size: 13px;
 }
+
+/* --- Widgets --- */
+.widget {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 0;
+  font-family: 'Inter', sans-serif; font-size: 13px;
+}
+.widget-label {
+  color: var(--text-secondary); font-weight: 500;
+  min-width: 80px;
+}
+.widget-value {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--text-muted); min-width: 40px;
+}
+.widget-slider input[type="range"] {
+  flex: 1; max-width: 300px;
+  accent-color: var(--accent);
+}
+.widget-text-input {
+  padding: 4px 8px; border: 1px solid var(--border);
+  border-radius: 4px; font-size: 13px;
+  background: var(--surface); color: var(--text);
+  font-family: 'JetBrains Mono', monospace;
+}
+.widget-text-input:focus { border-color: var(--accent); outline: none; }
+.widget-select-input {
+  padding: 4px 8px; border: 1px solid var(--border);
+  border-radius: 4px; font-size: 13px;
+  background: var(--surface); color: var(--text);
+}

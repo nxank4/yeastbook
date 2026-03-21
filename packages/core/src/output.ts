@@ -26,6 +26,9 @@ export function detectOutputType(value: unknown): OutputData | null {
   // Check for marker objects
   if (isPlainObject(value)) {
     const v = value as Record<string, unknown>;
+    if (v.__type === "widget") {
+      return { type: "widget", widgetId: v.__widgetId, widgetType: v.__widgetType, value: v.value, config: v.__config } as any;
+    }
     if (v.__type === "chart" && Array.isArray(v.data) && v.config) {
       return { type: "chart", data: v.data, config: v.config as ChartConfig };
     }

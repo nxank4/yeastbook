@@ -1,7 +1,7 @@
 // src/kernel/execute.ts
 
 import { $ } from "bun";
-import { transformCellCode } from "@yeastbook/core";
+import { transformCellCode, createSlider, createInput, createToggle, createSelect } from "@yeastbook/core";
 
 export interface ExecResult {
   value: unknown;
@@ -42,8 +42,8 @@ export async function executeCode(
     const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
     const wrapped = transformCellCode(code);
     // Expose Bun Shell ($) and Bun APIs as named parameters in cell context
-    const fn = new AsyncFunction("$", "Bun", wrapped);
-    const value = await fn($, Bun);
+    const fn = new AsyncFunction("$", "Bun", "createSlider", "createInput", "createToggle", "createSelect", wrapped);
+    const value = await fn($, Bun, createSlider, createInput, createToggle, createSelect);
 
     // Capture new globalThis keys into context
     for (const key of Object.keys(globalThis)) {
