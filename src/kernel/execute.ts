@@ -1,5 +1,6 @@
 // src/kernel/execute.ts
 
+import { $ } from "bun";
 import { transformCellCode } from "./transform.ts";
 
 export interface ExecResult {
@@ -40,8 +41,9 @@ export async function executeCode(
   try {
     const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
     const wrapped = transformCellCode(code);
-    const fn = new AsyncFunction(wrapped);
-    const value = await fn();
+    // Expose Bun Shell ($) and Bun APIs as named parameters in cell context
+    const fn = new AsyncFunction("$", "Bun", wrapped);
+    const value = await fn($, Bun);
 
     // Capture new globalThis keys into context
     for (const key of Object.keys(globalThis)) {
