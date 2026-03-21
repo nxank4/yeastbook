@@ -37,6 +37,20 @@ export async function executeCode(
   console.warn = (...args: unknown[]) => {
     stderr += args.map((a) => (typeof a === "string" ? a : Bun.inspect(a))).join(" ") + "\n";
   };
+  const origTable = console.table;
+  console.table = (data: unknown) => {
+    if (Array.isArray(data) && data.length > 0 && typeof data[0] === "object" && data[0] !== null) {
+      const rows = data as Record<string, unknown>[];
+      const keys = Object.keys(rows[0]);
+      const widths = keys.map((k) => Math.max(k.length, ...rows.map((r) => String(r[k] ?? "").length)));
+      const header = keys.map((k, i) => k.padEnd(widths[i])).join(" | ");
+      const sep = widths.map((w) => "-".repeat(w)).join("-+-");
+      const body = rows.map((r) => keys.map((k, i) => String(r[k] ?? "").padEnd(widths[i])).join(" | ")).join("\n");
+      stdout += header + "\n" + sep + "\n" + body + "\n";
+    } else {
+      stdout += (typeof data === "string" ? data : Bun.inspect(data)) + "\n";
+    }
+  };
 
   try {
     const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
@@ -69,5 +83,6 @@ export async function executeCode(
     console.log = origLog;
     console.error = origError;
     console.warn = origWarn;
+    console.table = origTable;
   }
 }
