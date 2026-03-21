@@ -3,6 +3,8 @@
 import { resolve, basename, dirname, join, extname } from "node:path";
 import { homedir } from "node:os";
 import { rename, mkdir } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { assets } from "./assets.ts";
 import { Notebook } from "./notebook.ts";
 import { executeCode } from "./kernel/execute.ts";
 import { loadNotebook as loadNb, ybkToIpynb, detectFormat, createEmptyYbk } from "./format.ts";
@@ -39,6 +41,11 @@ interface ServerState {
   context: Record<string, unknown>;
 }
 
+function isDevMode(): boolean {
+  // In dev mode, dist/ directory exists alongside source. In compiled binary, it won't.
+  return existsSync(resolve(import.meta.dirname!, "../dist"));
+}
+
 export async function startServer(filePath: string, port: number = 3000) {
   const absPath = resolve(filePath);
   const notebook = await Notebook.load(absPath);
@@ -69,23 +76,36 @@ export async function startServer(filePath: string, port: number = 3000) {
         if (server.upgrade(req)) return;
         return new Response("WebSocket upgrade failed", { status: 400 });
       }
-      // Serve static files from dist/
+      // Serve static files from dist/ or embedded assets
       if (url.pathname !== "/" && !url.pathname.startsWith("/api/")) {
-        const safePath = url.pathname.slice(1).replace(/\.\./g, "");
-        const filePath = resolve(distDir, safePath);
-        const ext = safePath.substring(safePath.lastIndexOf("."));
-        const contentType = CONTENT_TYPES[ext] || "application/octet-stream";
-        const file = Bun.file(filePath);
-        return new Response(file, {
-          headers: { "Content-Type": contentType },
-        });
+        if (isDevMode()) {
+          const safePath = url.pathname.slice(1).replace(/\.\./g, "");
+          const filePath = resolve(distDir, safePath);
+          const ext = safePath.substring(safePath.lastIndexOf("."));
+          const contentType = CONTENT_TYPES[ext] || "application/octet-stream";
+          return new Response(Bun.file(filePath), {
+            headers: { "Content-Type": contentType },
+          });
+        }
+        const asset = assets[url.pathname];
+        if (asset) {
+          return new Response(asset.content, {
+            headers: { "Content-Type": asset.mimeType },
+          });
+        }
       }
       return undefined;
     },
     routes: {
       "/": async () => {
-        return new Response(Bun.file(resolve(distDir, "index.html")), {
-          headers: { "Content-Type": "text/html; charset=utf-8" },
+        if (isDevMode()) {
+          return new Response(Bun.file(resolve(distDir, "index.html")), {
+            headers: { "Content-Type": "text/html; charset=utf-8" },
+          });
+        }
+        const asset = assets["/"];
+        return new Response(asset.content, {
+          headers: { "Content-Type": asset.mimeType },
         });
       },
       "/api/notebook": {
