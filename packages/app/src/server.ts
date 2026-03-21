@@ -143,7 +143,7 @@ export async function startServer(filePath: string, port: number = 3000) {
           });
         }
       }
-      return undefined;
+      return new Response("Not found", { status: 404 });
     },
     routes: {
       "/": async () => {
