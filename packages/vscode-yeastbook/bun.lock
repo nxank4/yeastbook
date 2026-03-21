@@ -1,0 +1,15 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "vscode-yeastbook",
+      "devDependencies": {
+        "@types/vscode": "^1.85.0",
+      },
+    },
+  },
+  "packages": {
+    "@types/vscode": ["@types/vscode@1.110.0", "", {}, "sha512-AGuxUEpU4F4mfuQjxPPaQVyuOMhs+VT/xRok1jiHVBubHK7lBRvCuOMZG0LKUwxncrPorJ5qq/uil3IdZBd5lA=="],
+  }
+}

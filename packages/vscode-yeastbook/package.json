@@ -1,0 +1,30 @@
+{
+  "name": "vscode-yeastbook",
+  "displayName": "Yeastbook",
+  "description": "TypeScript notebooks powered by Bun",
+  "version": "0.1.0",
+  "publisher": "yeastbook",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Notebooks"],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "customEditors": [{
+      "viewType": "yeastbook.notebook",
+      "displayName": "Yeastbook Notebook",
+      "selector": [
+        { "filenamePattern": "*.ybk" },
+        { "filenamePattern": "*.ipynb" }
+      ],
+      "priority": "default"
+    }],
+    "commands": [
+      { "command": "yeastbook.newNotebook", "title": "Yeastbook: New Notebook" },
+      { "command": "yeastbook.restartKernel", "title": "Yeastbook: Restart Kernel" }
+    ]
+  },
+  "scripts": {
+    "build": "bun build src/extension.ts --outdir dist --target node --format cjs --external vscode",
+    "package": "bunx @vscode/vsce package --no-dependencies"
+  },
+  "devDependencies": { "@types/vscode": "^1.85.0" }
+}
