@@ -215,8 +215,16 @@ export function App() {
           return next;
         });
         break;
+      case "notebook_updated":
+        showToast("Notebook updated externally. Reloading...");
+        fetch("/api/notebook").then((r) => r.json()).then((data) => {
+          setCells(data.cells || []);
+          if (data.fileName) setFileName(data.fileName);
+          if (data.fileFormat) setFileFormat(data.fileFormat);
+        });
+        break;
     }
-  }, []);
+  }, [showToast]);
 
   const { send, connected } = useWebSocket(handleWsMessage);
 
