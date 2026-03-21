@@ -52,9 +52,22 @@ export async function installPackages(
     await Promise.all([stdoutReader, stderrReader]);
     const exitCode = await proc.exited;
 
-    return exitCode === 0
-      ? { success: true }
-      : { success: false, error: `bun add exited with code ${exitCode}` };
+    if (exitCode === 0) {
+      // Silently try to install @types packages for better editor support
+      for (const pkg of packages) {
+        if (pkg.startsWith("@")) continue; // Skip scoped packages
+        try {
+          const typesProc = Bun.spawn(["bun", "add", "-d", `@types/${pkg}`], {
+            stdout: "ignore",
+            stderr: "ignore",
+          });
+          await typesProc.exited;
+        } catch {}
+      }
+      return { success: true };
+    }
+
+    return { success: false, error: `bun add exited with code ${exitCode}` };
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
     return { success: false, error };
