@@ -462,23 +462,6 @@ export function App() {
     setMode(newMode);
   }, []);
 
-  useKeyboardShortcuts({
-    cells,
-    focusedCellId,
-    mode,
-    onSetMode: setMode,
-    onAddCellAbove: handleAddCellAbove,
-    onAddCellBelow: handleAddCellBelow,
-    onDeleteCell: () => focusedCellId && handleDeleteCell(focusedCellId),
-    onChangeCellType: handleChangeCellType,
-    onFocusPrev: handleFocusPrev,
-    onFocusNext: handleFocusNext,
-    onEnterEdit: handleEnterEdit,
-    onRunCell: handleMenuRunCell,
-    onSave: handleSave,
-    onOpenPalette: () => setPaletteOpen(true),
-  });
-
   // --- Track focused cell ---
   useEffect(() => {
     const handler = (e: FocusEvent) => {
@@ -630,6 +613,24 @@ export function App() {
       return updated;
     });
   }, []);
+
+  // Keyboard shortcuts — must be after all callback definitions to avoid TDZ
+  useKeyboardShortcuts({
+    cells,
+    focusedCellId,
+    mode,
+    onSetMode: setMode,
+    onAddCellAbove: handleAddCellAbove,
+    onAddCellBelow: handleAddCellBelow,
+    onDeleteCell: () => focusedCellId && handleDeleteCell(focusedCellId),
+    onChangeCellType: handleChangeCellType,
+    onFocusPrev: handleFocusPrev,
+    onFocusNext: handleFocusNext,
+    onEnterEdit: handleEnterEdit,
+    onRunCell: handleMenuRunCell,
+    onSave: handleSave,
+    onOpenPalette: () => setPaletteOpen(true),
+  });
 
   return (
     <>
