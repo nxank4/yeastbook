@@ -1,0 +1,17 @@
+# Development files
+tests/
+scripts/
+docs/
+binaries/
+*.test.ts
+tsconfig.json
+CLAUDE.md
+
+# Notebooks
+*.ybk
+*.ipynb
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
