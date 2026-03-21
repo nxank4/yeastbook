@@ -55,6 +55,12 @@ export async function startServer(filePath: string, port: number = 3000) {
   const absPath = resolve(filePath);
   const notebook = await Notebook.load(absPath);
 
+  // Track this notebook as recently opened
+  try {
+    const { addRecent } = await import("./dashboard.ts");
+    await addRecent(absPath);
+  } catch {}
+
   const settings = await loadSettings();
 
   // Load plugins
@@ -358,6 +364,20 @@ export async function startServer(filePath: string, port: number = 3000) {
           });
           if (renderer.componentUrl) return Response.redirect(renderer.componentUrl);
           return new Response("No component", { status: 404 });
+        },
+      },
+      "/api/dashboard/files": {
+        GET: async () => {
+          const { listNotebooks } = await import("./dashboard.ts");
+          const files = await listNotebooks(process.cwd());
+          return Response.json({ files });
+        },
+      },
+      "/api/dashboard/recents": {
+        GET: async () => {
+          const { getRecents } = await import("./dashboard.ts");
+          const recents = await getRecents();
+          return Response.json({ recents });
         },
       },
     },

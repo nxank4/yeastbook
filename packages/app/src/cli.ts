@@ -206,8 +206,18 @@ const { positional, port, noOpen, ipynb } = parseFlags(process.argv.slice(2));
 const command = positional[0];
 
 if (!command) {
-  printUsage();
-  process.exit(0);
+  await checkWritePermission();
+  const filePath = resolve(`notebook-${Date.now()}.ybk`);
+  const actualPort = await findFreePort(port);
+  const server = await startServer(filePath, actualPort);
+  console.log(`Yeastbook running at http://localhost:${server.port}`);
+  console.log(`  Dashboard: /api/dashboard/files`);
+  console.log(`  Notebook: ${filePath}`);
+  process.on("SIGINT", () => {
+    console.log("\nShutting down yeastbook...");
+    server.stop();
+    process.exit(0);
+  });
 }
 
 if (command === "new") {
