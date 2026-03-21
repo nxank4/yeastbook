@@ -1,3 +1,10 @@
+## Branching Strategy
+
+- **`main`** — production branch. Only merge tested, stable code here.
+- **`staging`** — testing branch. All new features and fixes go here first for testing before merging to `main`.
+- Create feature branches off `staging`. PRs should target `staging` unless it's a hotfix for production.
+
+---
 
 Default to using Bun instead of Node.js.
 

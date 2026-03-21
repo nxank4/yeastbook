@@ -29,9 +29,34 @@ export interface NotebookData {
   cells: Cell[];
 }
 
+export interface Settings {
+  editor: {
+    fontSize: number;
+    tabSize: number;
+    wordWrap: boolean;
+  };
+  appearance: {
+    theme: "light" | "dark";
+  };
+  execution: {
+    autoSaveOnRun: boolean;
+    clearOutputBeforeRun: boolean;
+  };
+}
+
+export const DEFAULT_SETTINGS: Settings = {
+  editor: { fontSize: 13, tabSize: 2, wordWrap: false },
+  appearance: { theme: "light" },
+  execution: { autoSaveOnRun: true, clearOutputBeforeRun: false },
+};
+
+export type WsOutgoing =
+  | { type: "execute"; cellId: string; code: string }
+  | { type: "interrupt" };
+
 // WebSocket message types
 export type WsIncoming =
-  | { type: "status"; cellId: string; status: "busy" | "idle" }
+  | { type: "status"; cellId: string; status: "busy" | "idle"; executionCount?: number }
   | { type: "stream"; cellId: string; name: "stdout" | "stderr"; text: string }
   | { type: "result"; cellId: string; value: string; executionCount: number }
   | { type: "error"; cellId: string; ename: string; evalue: string; traceback: string[] };

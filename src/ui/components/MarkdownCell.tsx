@@ -8,9 +8,11 @@ interface Props {
   cell: Cell;
   onUpdate: (cellId: string, source: string) => void;
   onDelete: (cellId: string) => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
 }
 
-export function MarkdownCell({ cell, onUpdate, onDelete }: Props) {
+export function MarkdownCell({ cell, onUpdate, onDelete, onMoveUp, onMoveDown }: Props) {
   const source = cell.source.join("\n");
   const [editing, setEditing] = useState(!source.trim());
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -30,10 +32,17 @@ export function MarkdownCell({ cell, onUpdate, onDelete }: Props) {
     }
   }, [editing, autoResize]);
 
-  const handleBlur = () => {
+  const renderMarkdown = () => {
     const val = textareaRef.current?.value || "";
     onUpdate(cell.id, val);
     if (val.trim()) setEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && (e.shiftKey || e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      renderMarkdown();
+    }
   };
 
   // Content is sanitized via DOMPurify before being set as HTML
@@ -47,7 +56,12 @@ export function MarkdownCell({ cell, onUpdate, onDelete }: Props) {
         <span className="exec-count" />
         <span className="cell-type">markdown</span>
         <div className="cell-actions">
-          <button onClick={() => onDelete(cell.id)}>Delete</button>
+          {onMoveUp && <button onClick={() => onMoveUp()} title="Move up"><i className="bi bi-chevron-up" /></button>}
+          {onMoveDown && <button onClick={() => onMoveDown()} title="Move down"><i className="bi bi-chevron-down" /></button>}
+          {editing && (
+            <button className="run-btn" onClick={renderMarkdown} title="Render markdown"><i className="bi bi-play-fill" /></button>
+          )}
+          <button onClick={() => onDelete(cell.id)} title="Delete cell"><i className="bi bi-trash3" /></button>
         </div>
       </div>
       {editing ? (
@@ -57,7 +71,7 @@ export function MarkdownCell({ cell, onUpdate, onDelete }: Props) {
             defaultValue={source}
             placeholder="Markdown..."
             onInput={autoResize}
-            onBlur={handleBlur}
+            onKeyDown={handleKeyDown}
           />
         </div>
       ) : (

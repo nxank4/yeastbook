@@ -129,6 +129,14 @@ export class Notebook {
     }
   }
 
+  moveCell(id: string, direction: "up" | "down"): void {
+    const idx = this.cells.findIndex((c) => c.id === id);
+    if (idx === -1) return;
+    const target = direction === "up" ? idx - 1 : idx + 1;
+    if (target < 0 || target >= this.cells.length) return;
+    [this.cells[idx], this.cells[target]] = [this.cells[target], this.cells[idx]];
+  }
+
   getCell(id: string): Cell | undefined {
     return this.cells.find((c) => c.id === id);
   }

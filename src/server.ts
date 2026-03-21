@@ -1,8 +1,35 @@
 // src/server.ts — Bun HTTP+WebSocket server for notebook execution
 
-import { resolve } from "node:path";
+import { resolve, basename, dirname, join } from "node:path";
+import { homedir } from "node:os";
+import { rename, mkdir } from "node:fs/promises";
 import { Notebook } from "./notebook.ts";
 import { executeCode } from "./kernel/execute.ts";
+import type { Settings } from "./ui/types.ts";
+import { DEFAULT_SETTINGS } from "./ui/types.ts";
+
+const SETTINGS_DIR = join(homedir(), ".yeastbook");
+const SETTINGS_FILE = join(SETTINGS_DIR, "settings.json");
+
+async function loadSettings(): Promise<Settings> {
+  try {
+    const file = Bun.file(SETTINGS_FILE);
+    if (await file.exists()) {
+      const data = await file.json();
+      return { ...DEFAULT_SETTINGS, ...data,
+        editor: { ...DEFAULT_SETTINGS.editor, ...data.editor },
+        appearance: { ...DEFAULT_SETTINGS.appearance, ...data.appearance },
+        execution: { ...DEFAULT_SETTINGS.execution, ...data.execution },
+      };
+    }
+  } catch {}
+  return { ...DEFAULT_SETTINGS };
+}
+
+async function saveSettings(settings: Settings): Promise<void> {
+  await mkdir(SETTINGS_DIR, { recursive: true });
+  await Bun.write(SETTINGS_FILE, JSON.stringify(settings, null, 2));
+}
 
 interface ServerState {
   notebook: Notebook;
@@ -14,6 +41,8 @@ interface ServerState {
 export async function startServer(filePath: string, port: number = 3000) {
   const absPath = resolve(filePath);
   const notebook = await Notebook.load(absPath);
+
+  const settings = await loadSettings();
 
   const state: ServerState = {
     notebook,
@@ -59,7 +88,7 @@ export async function startServer(filePath: string, port: number = 3000) {
         });
       },
       "/api/notebook": {
-        GET: () => Response.json(state.notebook.toJSON()),
+        GET: () => Response.json({ ...state.notebook.toJSON(), filePath: state.filePath, fileName: basename(state.filePath) }),
       },
       "/api/cells": {
         POST: async (req) => {
@@ -82,10 +111,58 @@ export async function startServer(filePath: string, port: number = 3000) {
           return Response.json({ ok: true });
         },
       },
+      "/api/cells/:id/move": {
+        POST: async (req) => {
+          const body = await req.json() as { direction: "up" | "down" };
+          state.notebook.moveCell(req.params.id, body.direction);
+          await state.notebook.save(state.filePath);
+          return Response.json({ ok: true });
+        },
+      },
+      "/api/rename": {
+        POST: async (req) => {
+          const body = await req.json() as { name: string };
+          const newName = body.name.endsWith(".ipynb") ? body.name : body.name + ".ipynb";
+          const newPath = join(dirname(state.filePath), newName);
+          await rename(state.filePath, newPath);
+          state.filePath = newPath;
+          return Response.json({ fileName: basename(newPath) });
+        },
+      },
+      "/api/restart": {
+        POST: () => {
+          state.context = {};
+          state.executionCount = 0;
+          return Response.json({ ok: true });
+        },
+      },
       "/api/save": {
         POST: async () => {
           await state.notebook.save(state.filePath);
           return Response.json({ ok: true });
+        },
+      },
+      "/api/settings": {
+        GET: async () => {
+          const pkg = await Bun.file(resolve(import.meta.dirname!, "../package.json")).json();
+          return Response.json({
+            ...settings,
+            version: pkg.version,
+            bunVersion: Bun.version,
+          });
+        },
+        POST: async (req) => {
+          const body = await req.json() as Partial<Settings>;
+          Object.assign(settings.editor, body.editor);
+          Object.assign(settings.appearance, body.appearance);
+          Object.assign(settings.execution, body.execution);
+          await saveSettings(settings);
+          const pkg = await Bun.file(resolve(import.meta.dirname!, "../package.json")).json();
+          return Response.json({
+            ...settings,
+            version: pkg.version,
+            bunVersion: Bun.version,
+          });
         },
       },
     },
@@ -137,7 +214,7 @@ export async function startServer(filePath: string, port: number = 3000) {
             }));
           }
 
-          ws.send(JSON.stringify({ type: "status", cellId: msg.cellId, status: "idle" }));
+          ws.send(JSON.stringify({ type: "status", cellId: msg.cellId, status: "idle", executionCount: state.executionCount }));
           await state.notebook.save(state.filePath);
         }
       },
