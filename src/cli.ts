@@ -95,13 +95,16 @@ async function pluginList(): Promise<void> {
   await ensurePluginsDir();
   const { PluginLoader } = await import("./plugins/loader.ts");
   const loader = new PluginLoader(pluginsBaseDir);
-  const plugins = await loader.loadAll();
+  await loader.loadAll();
+  const plugins = loader.getPlugins();
   if (plugins.length === 0) {
     console.log("No plugins installed.");
+    console.log(`Plugin directory: ${pluginsBaseDir}`);
   } else {
     console.log("Installed plugins:");
     for (const p of plugins) {
-      console.log(`  - ${p.name}${p.version ? `@${p.version}` : ""}`);
+      const renderers = (p.renderers ?? []).map((r) => r.type).join(", ");
+      console.log(`  ${p.name}@${p.version}${renderers ? ` (renderers: ${renderers})` : ""}`);
     }
   }
 }
