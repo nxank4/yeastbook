@@ -637,10 +637,6 @@ export function App() {
       <div className="toolbar">
         <span className="toolbar-logo">🍞 yeastbook</span>
         <EditableFileName fileName={fileName} onRename={handleRename} />
-        <div className={`status ${connected ? "connected" : ""}`}>
-          <span className={`status-dot ${connected ? "connected" : ""}`} />
-          {connected ? "Connected" : "Disconnected"}
-        </div>
       </div>
       <MenuBar
         focusedCellId={focusedCellId}

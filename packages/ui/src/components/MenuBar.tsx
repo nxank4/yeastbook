@@ -1,6 +1,39 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import type { Cell } from "@yeastbook/core";
 
+interface NotebookFile {
+  name: string;
+  path: string;
+  size: number;
+  modified: string;
+}
+
+function OpenFileMenu({ onOpen, onClose }: { onOpen: (path: string) => void; onClose: () => void }) {
+  const [files, setFiles] = useState<NotebookFile[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/dashboard/files")
+      .then((r) => r.json())
+      .then((d) => { setFiles(d.files || []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  return (
+    <div className="menu-dropdown open-file-dropdown">
+      <div className="open-file-header">Open Notebook</div>
+      {loading && <div className="menu-item disabled">Loading...</div>}
+      {!loading && files.length === 0 && <div className="menu-item disabled">No .ybk or .ipynb files in current directory</div>}
+      {files.map((f) => (
+        <button key={f.path} className="menu-item" onClick={() => { onOpen(f.path); onClose(); }}>
+          <span>{f.name}</span>
+          <span className="menu-shortcut">{(f.size / 1024).toFixed(1)} KB</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 type MenuItem =
   | { label: string; action: () => void; shortcut?: string; disabled?: boolean }
   | { separator: true };
@@ -40,9 +73,10 @@ interface Props {
 
 export function MenuBar(props: Props) {
   const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const [showOpenFile, setShowOpenFile] = useState(false);
   const barRef = useRef<HTMLDivElement>(null);
 
-  const closeAll = useCallback(() => setOpenMenu(null), []);
+  const closeAll = useCallback(() => { setOpenMenu(null); setShowOpenFile(false); }, []);
 
   useEffect(() => {
     if (!openMenu) return;
@@ -70,8 +104,7 @@ export function MenuBar(props: Props) {
       items: [
         { label: "New Notebook (.ybk)", action: props.onNewNotebook },
         { separator: true },
-        { label: "Open .ybk...", action: () => { const p = prompt("Path to .ybk file:"); if (p) props.onOpenFile(p); } },
-        { label: "Open .ipynb...", action: () => { const p = prompt("Path to .ipynb file:"); if (p) props.onOpenFile(p); } },
+        { label: "Open Notebook...", action: () => setShowOpenFile(true) },
         { separator: true },
         { label: "Save", action: props.onSave, shortcut: "Ctrl+S" },
         { separator: true },
@@ -124,38 +157,47 @@ export function MenuBar(props: Props) {
   ];
 
   return (
-    <div className="menubar" ref={barRef}>
-      {menus.map((menu) => (
-        <div key={menu.label} className="menu-container">
-          <button
-            className={`menu-trigger ${openMenu === menu.label ? "active" : ""}`}
-            onClick={() => setOpenMenu(openMenu === menu.label ? null : menu.label)}
-            onMouseEnter={() => openMenu && setOpenMenu(menu.label)}
-          >
-            {menu.label}
-          </button>
-          {openMenu === menu.label && (
-            <div className="menu-dropdown">
-              {menu.items.map((item, i) =>
-                "separator" in item ? (
-                  <hr key={i} className="menu-separator" />
-                ) : (
-                  <button
-                    key={i}
-                    className={`menu-item ${item.disabled ? "disabled" : ""}`}
-                    onClick={() => { if (!item.disabled) { item.action(); closeAll(); } }}
-                    disabled={item.disabled}
-                  >
-                    <span>{item.label}</span>
-                    {item.shortcut && <span className="menu-shortcut">{item.shortcut}</span>}
-                  </button>
-                )
-              )}
-            </div>
-          )}
+    <>
+      <div className="menubar" ref={barRef}>
+        {menus.map((menu) => (
+          <div key={menu.label} className="menu-container">
+            <button
+              className={`menu-trigger ${openMenu === menu.label ? "active" : ""}`}
+              onClick={() => setOpenMenu(openMenu === menu.label ? null : menu.label)}
+              onMouseEnter={() => openMenu && setOpenMenu(menu.label)}
+            >
+              {menu.label}
+            </button>
+            {openMenu === menu.label && (
+              <div className="menu-dropdown">
+                {menu.items.map((item, i) =>
+                  "separator" in item ? (
+                    <hr key={i} className="menu-separator" />
+                  ) : (
+                    <button
+                      key={i}
+                      className={`menu-item ${item.disabled ? "disabled" : ""}`}
+                      onClick={() => { if (!item.disabled) { item.action(); closeAll(); } }}
+                      disabled={item.disabled}
+                    >
+                      <span>{item.label}</span>
+                      {item.shortcut && <span className="menu-shortcut">{item.shortcut}</span>}
+                    </button>
+                  )
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      {showOpenFile && (
+        <div className="open-file-overlay" onClick={() => setShowOpenFile(false)}>
+          <div onClick={(e) => e.stopPropagation()}>
+            <OpenFileMenu onOpen={props.onOpenFile} onClose={() => setShowOpenFile(false)} />
+          </div>
         </div>
-      ))}
-    </div>
+      )}
+    </>
   );
 }
 

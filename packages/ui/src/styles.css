@@ -547,6 +547,27 @@ input, textarea, select {
 }
 .settings-link:hover { opacity: 0.8; }
 
+/* --- Open File Picker --- */
+.open-file-overlay {
+  position: fixed; inset: 0; z-index: 500;
+  background: rgba(0, 0, 0, 0.3);
+  display: flex; justify-content: center; padding-top: 15vh;
+}
+.open-file-dropdown {
+  width: 400px; max-width: 90vw; max-height: 400px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  box-shadow: var(--shadow-dropdown);
+  overflow-y: auto;
+}
+.open-file-header {
+  padding: 12px 16px;
+  font-weight: 600; font-size: 13px;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
 /* --- Toggle switch --- */
 .toggle {
   position: relative; width: 36px; height: 20px;
