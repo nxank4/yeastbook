@@ -636,9 +636,6 @@ export function App() {
     <>
       <div className="toolbar">
         <EditableFileName fileName={fileName} onRename={handleRename} />
-        <span className="save-indicator">
-          {saved ? <><i className="bi bi-check-circle" /> Saved</> : <><i className="bi bi-pencil" /> Unsaved</>}
-        </span>
         <div className={`status ${connected ? "connected" : ""}`}>
           <i className={`bi ${connected ? "bi-wifi" : "bi-wifi-off"}`} /> {connected ? "ready" : "connecting..."}
         </div>

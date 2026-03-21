@@ -86,6 +86,15 @@ export function CodeCell({
       () => onRunRef.current(cell.id, sourceRef.current),
     );
 
+    // Escape: exit to command mode
+    editor.addCommand(
+      monaco.KeyCode.Escape,
+      () => {
+        (editor.getDomNode()?.ownerDocument?.activeElement as HTMLElement)?.blur();
+        onModeChange?.("command");
+      },
+    );
+
     // Mode change on focus/blur
     editor.onDidFocusEditorText(() => onModeChange?.("edit"));
     editor.onDidBlurEditorText(() => onModeChange?.("command"));
@@ -205,7 +214,7 @@ export function CodeCell({
         <Editor
           height={editorHeight}
           defaultLanguage="typescript"
-          defaultValue={cell.source.join("\n")}
+          defaultValue={cell.source.join("\n") || ""}
           theme={theme === "dark" ? "vs-dark" : "vs"}
           onMount={handleEditorMount}
           options={{
@@ -215,11 +224,12 @@ export function CodeCell({
             tabSize,
             wordWrap: wordWrap ? "on" : "off",
             lineNumbers: "on",
+            lineNumbersMinChars: 3,
+            lineDecorationsWidth: 10,
             glyphMargin: false,
             folding: false,
-            lineDecorationsWidth: 0,
             renderLineHighlight: "none",
-            scrollbar: { vertical: "hidden", horizontal: "hidden" },
+            scrollbar: { vertical: "hidden", horizontal: "auto" },
             overviewRulerLanes: 0,
             automaticLayout: true,
             padding: { top: 8, bottom: 8 },

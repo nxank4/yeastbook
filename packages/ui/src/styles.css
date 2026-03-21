@@ -167,10 +167,11 @@ input, textarea, select {
   position: relative;
   margin-bottom: 12px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--surface);
   box-shadow: var(--shadow-sm);
   transition: border-color 0.15s, box-shadow 0.2s, background 0.2s;
+  overflow: hidden;
 }
 
 .cell:hover {
@@ -179,13 +180,14 @@ input, textarea, select {
 }
 
 .cell:focus-within {
-  border-color: var(--accent);
+  border: 2px solid var(--accent);
   box-shadow: var(--shadow-focus);
 }
 
 .cell-header {
   display: flex; align-items: center; gap: 8px;
   padding: 6px 12px;
+  height: 36px;
   border-bottom: 1px solid var(--border-light);
   font-size: 12px; color: var(--text-faint);
   transition: border-color 0.2s, color 0.2s;
@@ -220,6 +222,9 @@ input, textarea, select {
 /* --- Code area --- */
 .code-area {
   position: relative;
+  width: 100%;
+  overflow: hidden;
+  min-height: 60px;
 }
 
 .code-area textarea {
@@ -750,12 +755,13 @@ input, textarea, select {
   z-index: 10;
 }
 .mode-indicator {
-  font-weight: 600; text-transform: uppercase;
-  padding: 1px 8px; border-radius: 3px;
-  font-size: 10px; letter-spacing: 0.05em;
+  font-weight: 700; text-transform: uppercase;
+  padding: 2px 12px; border-radius: 3px;
+  font-size: 11px; letter-spacing: 0.05em;
+  min-width: 70px; text-align: center;
 }
 .mode-command { background: #4A90D9; color: white; }
-.mode-edit { background: var(--accent); color: white; }
+.mode-edit { background: #D97706; color: white; }
 .status-bar-spacer { flex: 1; }
 .status-bar-sep { margin: 0 8px; color: var(--border); }
 .status-bar-text { font-size: 11px; }
