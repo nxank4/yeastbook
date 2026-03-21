@@ -114,4 +114,22 @@ describe("transformCellCode", () => {
     const result = transformCellCode(code);
     expect(result).not.toContain("globalThis.x");
   });
+
+  test("strips export keyword from top-level declarations", () => {
+    const result = transformCellCode("export const x = 1");
+    expect(result).toContain("var x =");
+    expect(result).not.toContain("export");
+  });
+
+  test("strips export from function declarations", () => {
+    const result = transformCellCode("export function foo() { return 1 }");
+    expect(result).toContain("function foo()");
+    expect(result).not.toContain("export");
+  });
+
+  test("preserves export inside functions", () => {
+    const code = "function foo() {\n  export const x = 1\n}";
+    const result = transformCellCode(code);
+    expect(result).toContain("export const x = 1");
+  });
 });

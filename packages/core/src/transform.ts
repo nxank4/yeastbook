@@ -34,11 +34,23 @@ export function transformCellCode(code: string): string {
     const indent = line.substring(0, line.length - trimmed.length);
 
     if (braceDepth === 0) {
+      // Strip top-level export keyword
+      if (trimmed.startsWith("export ")) {
+        const afterExport = trimmed.slice(7);
+        if (/^(const |let |var |function |class )/.test(afterExport)) {
+          line = indent + afterExport;
+        }
+      }
+
+      // Re-read trimmed/indent after potential export strip
+      const trimmed2 = line.trimStart();
+      const indent2 = line.substring(0, line.length - trimmed2.length);
+
       // Convert top-level const/let → var
-      if (trimmed.startsWith("const ")) {
-        line = indent + "var " + trimmed.slice(6);
-      } else if (trimmed.startsWith("let ")) {
-        line = indent + "var " + trimmed.slice(4);
+      if (trimmed2.startsWith("const ")) {
+        line = indent2 + "var " + trimmed2.slice(6);
+      } else if (trimmed2.startsWith("let ")) {
+        line = indent2 + "var " + trimmed2.slice(4);
       }
 
       // Hoist top-level var declarations to globalThis for cross-cell persistence
