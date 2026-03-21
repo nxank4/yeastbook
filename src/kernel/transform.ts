@@ -4,7 +4,7 @@ const STATEMENT_PREFIXES = [
   "var ", "let ", "const ", "if ", "if(", "for ", "for(",
   "while ", "while(", "do ", "do{", "class ", "function ",
   "return ", "throw ", "try ", "try{", "switch ", "switch(",
-  "import ", "export ", "{", "//", "/*",
+  "import ", "export ", "{", "}", "]", ")", "//", "/*",
 ];
 
 function isStatement(line: string): boolean {

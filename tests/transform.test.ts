@@ -95,4 +95,10 @@ describe("transformCellCode", () => {
     expect(result).toContain("globalThis.a = a");
     expect(result).toContain("globalThis.b = b");
   });
+
+  test("does not add return to closing braces", () => {
+    const code = "for (const item of [1,2,3]) {\n  console.log(item)\n}";
+    const result = transformCellCode(code);
+    expect(result).not.toContain("return (})");
+  });
 });
