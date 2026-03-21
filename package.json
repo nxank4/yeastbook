@@ -36,7 +36,9 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@monaco-editor/react": "^4.7.0",
     "bootstrap-icons": "^1.13.1",
+    "chart.js": "^4.5.1",
     "dompurify": "^3.3.3",
     "marked": "^17.0.5",
     "react": "^19.2.4",
