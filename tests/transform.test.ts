@@ -101,4 +101,17 @@ describe("transformCellCode", () => {
     const result = transformCellCode(code);
     expect(result).not.toContain("return (})");
   });
+
+  test("does not hoist var inside functions to globalThis", () => {
+    const code = "function f() {\n  var x = 1\n  return x\n}";
+    const result = transformCellCode(code);
+    expect(result).not.toContain("globalThis.x");
+    expect(result).toContain("var x = 1");
+  });
+
+  test("does not hoist var inside blocks to globalThis", () => {
+    const code = "if (true) {\n  var x = 1\n}";
+    const result = transformCellCode(code);
+    expect(result).not.toContain("globalThis.x");
+  });
 });

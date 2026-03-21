@@ -24,51 +24,50 @@ export function transformCellCode(code: string): string {
   const transformed: string[] = [];
   let braceDepth = 0;
 
+  // Single pass: convert const/let → var and hoist to globalThis (top-level only)
+  // Note: brace depth tracking is a simple character counter that doesn't account for
+  // braces inside string literals, template literals, comments, or regex. This is a known
+  // limitation acceptable for typical notebook code.
   for (let i = 0; i < lines.length; i++) {
     let line = lines[i]!;
     const trimmed = line.trimStart();
     const indent = line.substring(0, line.length - trimmed.length);
 
-    // At top level (braceDepth === 0), convert const/let to var
     if (braceDepth === 0) {
+      // Convert top-level const/let → var
       if (trimmed.startsWith("const ")) {
         line = indent + "var " + trimmed.slice(6);
       } else if (trimmed.startsWith("let ")) {
         line = indent + "var " + trimmed.slice(4);
       }
+
+      // Hoist top-level var declarations to globalThis for cross-cell persistence
+      const trimmedAfter = line.trimStart();
+      const indentAfter = line.substring(0, line.length - trimmedAfter.length);
+
+      const simpleMatch = trimmedAfter.match(/^var\s+(\w+)\s*=\s*(.+)$/);
+      if (simpleMatch) {
+        line = `${indentAfter}var ${simpleMatch[1]} = globalThis.${simpleMatch[1]} = ${simpleMatch[2]}`;
+      } else {
+        // Destructuring: var { a, b } = expr  OR  var [x, y] = expr
+        // Known limitation: nested destructuring ({ a: { b } }) is not supported.
+        const destructMatch = trimmedAfter.match(/^var\s+(\{[^}]+\}|\[[^\]]+\])\s*=\s*(.+)$/);
+        if (destructMatch) {
+          const pattern = destructMatch[1];
+          const expr = destructMatch[2];
+          const names = pattern.replace(/[{}\[\]\s\.]+/g, " ").trim().split(/\s*,\s*|\s+/).filter(n => /^\w+$/.test(n));
+          const assignments = names.map(n => `globalThis.${n} = ${n}`).join("; ");
+          line = `${indentAfter}var ${pattern} = ${expr}; ${assignments}`;
+        }
+      }
     }
 
     transformed.push(line);
 
-    // Track brace depth (simple counter - good enough for typical notebook code)
+    // Track brace depth
     for (const ch of trimmed) {
       if (ch === "{") braceDepth++;
       else if (ch === "}") braceDepth = Math.max(0, braceDepth - 1);
-    }
-  }
-
-  // Hoist var declarations to globalThis for cross-cell persistence
-  for (let i = 0; i < transformed.length; i++) {
-    const line = transformed[i]!;
-    const trimmedLine = line.trimStart();
-    const lineIndent = line.substring(0, line.length - trimmedLine.length);
-
-    // Simple var: var name = expr
-    const simpleMatch = trimmedLine.match(/^var\s+(\w+)\s*=\s*(.+)$/);
-    if (simpleMatch) {
-      transformed[i] = `${lineIndent}var ${simpleMatch[1]} = globalThis.${simpleMatch[1]} = ${simpleMatch[2]}`;
-      continue;
-    }
-
-    // Destructuring var: var { a, b } = expr  OR  var [x, y] = expr
-    const destructMatch = trimmedLine.match(/^var\s+(\{[^}]+\}|\[[^\]]+\])\s*=\s*(.+)$/);
-    if (destructMatch) {
-      const pattern = destructMatch[1];
-      const expr = destructMatch[2];
-      const names = pattern.replace(/[{}\[\]\s\.]+/g, " ").trim().split(/\s*,\s*|\s+/).filter(n => /^\w+$/.test(n));
-      const assignments = names.map(n => `globalThis.${n} = ${n}`).join("; ");
-      transformed[i] = `${lineIndent}var ${pattern} = ${expr}; ${assignments}`;
-      continue;
     }
   }
 
