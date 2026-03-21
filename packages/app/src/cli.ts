@@ -17,6 +17,7 @@ interface ParsedArgs {
   port: number;
   noOpen: boolean;
   ipynb: boolean;
+  dev: boolean;
 }
 
 function parseFlags(argv: string[]): ParsedArgs {
@@ -24,6 +25,7 @@ function parseFlags(argv: string[]): ParsedArgs {
   let port = parseInt(process.env.PORT ?? "3000", 10);
   let noOpen = false;
   let ipynb = false;
+  let dev = false;
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -42,12 +44,14 @@ function parseFlags(argv: string[]): ParsedArgs {
       noOpen = true;
     } else if (arg === "--ipynb") {
       ipynb = true;
+    } else if (arg === "--dev") {
+      dev = true;
     } else {
       positional.push(arg);
     }
   }
 
-  return { positional, port, noOpen, ipynb };
+  return { positional, port, noOpen, ipynb, dev };
 }
 
 // ---------------------------------------------------------------------------
@@ -79,6 +83,7 @@ function printUsage(): void {
   console.log("  --port <n>    Port to listen on (default: $PORT or 3000)");
   console.log("  --no-open     Do not open browser after starting server");
   console.log("  --ipynb       Use .ipynb format (with `new` command)");
+  console.log("  --dev         Dev mode: serve from dist/, watch for UI changes");
 }
 
 async function findFreePort(start = 3000): Promise<number> {
@@ -202,14 +207,14 @@ async function handlePlugin(subArgs: string[]): Promise<void> {
 // Main dispatch
 // ---------------------------------------------------------------------------
 
-const { positional, port, noOpen, ipynb } = parseFlags(process.argv.slice(2));
+const { positional, port, noOpen, ipynb, dev } = parseFlags(process.argv.slice(2));
 const command = positional[0];
 
 if (!command) {
   await checkWritePermission();
   const filePath = resolve(`notebook-${Date.now()}.ybk`);
   const actualPort = await findFreePort(port);
-  const server = await startServer(filePath, actualPort);
+  const server = await startServer(filePath, actualPort, dev);
   console.log(`Yeastbook running at http://localhost:${server.port}`);
   console.log(`  Dashboard: /api/dashboard/files`);
   console.log(`  Notebook: ${filePath}`);
@@ -227,7 +232,7 @@ if (command === "new") {
   console.log(`Creating new notebook: ${filePath}`);
 
   const actualPort = await findFreePort(port);
-  const server = await startServer(filePath, actualPort);
+  const server = await startServer(filePath, actualPort, dev);
   console.log(`Yeastbook running at http://localhost:${server.port}`);
   console.log(`Notebook: ${filePath}`);
   process.on("SIGINT", () => {
@@ -264,7 +269,7 @@ if (command === "new") {
   await checkWritePermission();
   const filePath = resolve(command);
   const actualPort = await findFreePort(port);
-  const server = await startServer(filePath, actualPort);
+  const server = await startServer(filePath, actualPort, dev);
   console.log(`Yeastbook running at http://localhost:${server.port}`);
   console.log(`Notebook: ${filePath}`);
   process.on("SIGINT", () => {

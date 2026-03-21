@@ -3,7 +3,7 @@
 import { resolve, basename, dirname, join, extname } from "node:path";
 import { homedir } from "node:os";
 import { rename, mkdir } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { existsSync, watch as fsWatch } from "node:fs";
 import { assets } from "./assets.ts";
 import { executeCode } from "./kernel/execute.ts";
 import { installPackages } from "./kernel/installer.ts";
@@ -46,12 +46,11 @@ interface ServerState {
   context: Record<string, unknown>;
 }
 
-function isDevMode(): boolean {
-  // In dev mode, dist/ directory exists alongside source. In compiled binary, it won't.
+function hasDistDir(): boolean {
   return existsSync(resolve(import.meta.dirname!, "../../ui/dist"));
 }
 
-export async function startServer(filePath: string, port: number = 3000) {
+export async function startServer(filePath: string, port: number = 3000, devMode: boolean = false) {
   const absPath = resolve(filePath);
   const notebook = await Notebook.load(absPath);
 
@@ -107,6 +106,20 @@ export async function startServer(filePath: string, port: number = 3000) {
 
   const distDir = resolve(import.meta.dirname!, "../../ui/dist");
 
+  // In dev mode, watch dist/ for UI rebuilds and notify clients to reload
+  if (devMode && existsSync(distDir)) {
+    let hmrDebounce: ReturnType<typeof setTimeout> | null = null;
+    fsWatch(distDir, { recursive: true }, () => {
+      if (hmrDebounce) clearTimeout(hmrDebounce);
+      hmrDebounce = setTimeout(() => {
+        for (const c of clients) {
+          try { c.send(JSON.stringify({ type: "hmr_reload" })); } catch {}
+        }
+      }, 300);
+    });
+    console.log("Dev mode: watching UI dist/ for changes");
+  }
+
   const CONTENT_TYPES: Record<string, string> = {
     ".html": "text/html; charset=utf-8",
     ".js": "text/javascript; charset=utf-8",
@@ -124,7 +137,7 @@ export async function startServer(filePath: string, port: number = 3000) {
       }
       // Serve static files from dist/ or embedded assets
       if (url.pathname !== "/" && !url.pathname.startsWith("/api/")) {
-        if (isDevMode()) {
+        if ((devMode || hasDistDir())) {
           const safePath = url.pathname.slice(1);
           const filePath = resolve(distDir, safePath);
           if (!filePath.startsWith(distDir + "/")) {
@@ -147,7 +160,7 @@ export async function startServer(filePath: string, port: number = 3000) {
     },
     routes: {
       "/": async () => {
-        if (isDevMode()) {
+        if ((devMode || hasDistDir())) {
           return new Response(Bun.file(resolve(distDir, "index.html")), {
             headers: { "Content-Type": "text/html; charset=utf-8" },
           });

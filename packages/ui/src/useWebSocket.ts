@@ -21,8 +21,13 @@ export function useWebSocket(onMessage: MessageHandler) {
         setTimeout(connect, 2000);
       };
       ws.onmessage = (e) => {
-        const msg: WsIncoming = JSON.parse(e.data as string);
-        onMessageRef.current(msg);
+        const msg = JSON.parse(e.data as string);
+        // Dev mode: full page reload when UI is rebuilt
+        if (msg.type === "hmr_reload") {
+          window.location.reload();
+          return;
+        }
+        onMessageRef.current(msg as WsIncoming);
       };
     }
 
