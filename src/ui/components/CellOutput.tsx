@@ -1,3 +1,7 @@
+import { JsonTree } from "./outputs/JsonTree.tsx";
+import { DataTable } from "./outputs/DataTable.tsx";
+import { ChartOutput } from "./outputs/ChartOutput.tsx";
+import { HtmlOutput } from "./outputs/HtmlOutput.tsx";
 import type { CellOutput as CellOutputType } from "../types.ts";
 
 interface Props {
@@ -15,6 +19,14 @@ export function CellOutput({ outputs }: Props) {
           return <div key={i} className={cls}>{(out.text || []).join("")}</div>;
         }
         if (out.output_type === "execute_result") {
+          // Rich output rendering
+          if (out.richOutput) {
+            return (
+              <div key={i} className="output-rich">
+                <RichOutputRenderer output={out.richOutput} />
+              </div>
+            );
+          }
           return (
             <div key={i} className="output-result">
               {out.data?.["text/plain"] || ""}
@@ -35,4 +47,21 @@ export function CellOutput({ outputs }: Props) {
       })}
     </div>
   );
+}
+
+function RichOutputRenderer({ output }: { output: NonNullable<CellOutputType["richOutput"]> }) {
+  switch (output.type) {
+    case "table":
+      return <DataTable rows={output.rows} />;
+    case "chart":
+      return <ChartOutput data={output.data} config={output.config as any} />;
+    case "html":
+      return <HtmlOutput html={output.html} />;
+    case "json":
+      return <JsonTree data={output.data} />;
+    case "text":
+      return <div className="output-result">{output.text}</div>;
+    default:
+      return null;
+  }
 }

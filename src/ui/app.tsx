@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { NotebookView } from "./components/NotebookView.tsx";
 import { EditableFileName } from "./components/EditableFileName.tsx";
 import { SettingsPanel } from "./components/SettingsPanel.tsx";
+import { MenuBar, ShortcutsModal, AboutModal } from "./components/MenuBar.tsx";
 import { useWebSocket } from "./useWebSocket.ts";
 import type { Cell, CellOutput, WsIncoming, Settings } from "./types.ts";
 import { DEFAULT_SETTINGS } from "./types.ts";
@@ -23,9 +24,20 @@ export function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [version, setVersion] = useState("");
   const [bunVersion, setBunVersion] = useState("");
+  const [fileFormat, setFileFormat] = useState<"ybk" | "ipynb">("ybk");
   const [runningAll, setRunningAll] = useState(false);
+  const [focusedCellId, setFocusedCellId] = useState<string | null>(null);
+  const [clipboardCell, setClipboardCell] = useState<Cell | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const pendingFocusCellId = useRef<string | null>(null);
   const runAllResolveRef = useRef<(() => void) | null>(null);
+
+  const showToast = useCallback((msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 3000);
+  }, []);
 
   // Load settings from server on mount
   useEffect(() => {
@@ -42,7 +54,6 @@ export function App() {
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
     localStorage.setItem("yeastbook-theme", theme);
-    // Switch highlight.js theme
     const light = document.getElementById("hljs-light") as HTMLLinkElement | null;
     const dark = document.getElementById("hljs-dark") as HTMLLinkElement | null;
     if (light) light.media = theme === "light" ? "all" : "not all";
@@ -75,7 +86,6 @@ export function App() {
     });
   }, []);
 
-  // Apply editor settings as CSS custom properties
   useEffect(() => {
     const root = document.documentElement;
     root.style.setProperty("--editor-font-size", settings.editor.fontSize + "px");
@@ -83,6 +93,7 @@ export function App() {
     root.style.setProperty("--editor-word-wrap", settings.editor.wordWrap ? "pre-wrap" : "pre");
   }, [settings.editor]);
 
+  // --- WebSocket ---
   const handleWsMessage = useCallback((msg: WsIncoming) => {
     switch (msg.type) {
       case "status":
@@ -144,6 +155,7 @@ export function App() {
               data: { "text/plain": msg.value },
               metadata: {},
               execution_count: msg.executionCount,
+              richOutput: msg.richOutput,
             },
           ]);
           return next;
@@ -175,15 +187,18 @@ export function App() {
 
   const { send, connected } = useWebSocket(handleWsMessage);
 
-  useEffect(() => {
-    fetch("/api/notebook")
-      .then((res) => res.json())
-      .then((data) => {
-        setCells(data.cells || []);
-        if (data.fileName) setFileName(data.fileName);
-      });
+  // --- Load notebook ---
+  const loadNotebookData = useCallback((data: any) => {
+    setCells(data.cells || []);
+    if (data.fileName) setFileName(data.fileName);
+    if (data.fileFormat) setFileFormat(data.fileFormat);
   }, []);
 
+  useEffect(() => {
+    fetch("/api/notebook").then((res) => res.json()).then(loadNotebookData);
+  }, [loadNotebookData]);
+
+  // --- Cell operations ---
   const handleRunCell = useCallback(
     (cellId: string, code: string) => {
       if (settings.execution.clearOutputBeforeRun) {
@@ -216,7 +231,6 @@ export function App() {
     [handleRunCell]
   );
 
-  // Focus next cell after state update
   useEffect(() => {
     if (pendingFocusCellId.current) {
       const id = pendingFocusCellId.current;
@@ -264,14 +278,7 @@ export function App() {
       body: JSON.stringify({ type, source: "" }),
     });
     const { id } = await res.json();
-    const cell: Cell = {
-      id,
-      cell_type: type,
-      source: [],
-      outputs: [],
-      execution_count: null,
-      metadata: {},
-    };
+    const cell: Cell = { id, cell_type: type, source: [], outputs: [], execution_count: null, metadata: {} };
     setCells((prev) => [...prev, cell]);
     setSaved(true);
   }, []);
@@ -304,6 +311,7 @@ export function App() {
     });
     const data = await res.json();
     if (data.fileName) setFileName(data.fileName);
+    if (data.fileFormat) setFileFormat(data.fileFormat);
   }, []);
 
   const handleRestart = useCallback(async () => {
@@ -317,19 +325,15 @@ export function App() {
 
   const handleRunAll = useCallback(async () => {
     setRunningAll(true);
-    // Snapshot current cells
     const currentCells = await new Promise<Cell[]>((resolve) => {
       setCells((prev) => { resolve(prev); return prev; });
     });
     const codeCells = currentCells.filter((c) => c.cell_type === "code");
 
     for (const cell of codeCells) {
-      // Get latest source from textarea
       const ta = document.querySelector(`#cell-${cell.id} textarea`) as HTMLTextAreaElement | null;
       const code = ta?.value ?? cell.source.join("\n");
       if (!code.trim()) continue;
-
-      // Wait for this cell to finish
       await new Promise<void>((resolve) => {
         runAllResolveRef.current = resolve;
         handleRunCell(cell.id, code);
@@ -338,6 +342,163 @@ export function App() {
     setRunningAll(false);
   }, [handleRunCell]);
 
+  const handleSave = useCallback(async () => {
+    await fetch("/api/save", { method: "POST" });
+    setSaved(true);
+    showToast("Saved");
+  }, [showToast]);
+
+  // --- Ctrl+S ---
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+        handleSave();
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [handleSave]);
+
+  // --- Track focused cell ---
+  useEffect(() => {
+    const handler = (e: FocusEvent) => {
+      const target = e.target as HTMLElement;
+      const cell = target.closest?.("[id^='cell-']");
+      if (cell) {
+        setFocusedCellId(cell.id.replace("cell-", ""));
+      }
+    };
+    document.addEventListener("focusin", handler);
+    return () => document.removeEventListener("focusin", handler);
+  }, []);
+
+  // --- Menu actions ---
+  const handleNewNotebook = useCallback(async () => {
+    const res = await fetch("/api/new", { method: "POST" });
+    const data = await res.json();
+    loadNotebookData(data);
+    showToast("New notebook created");
+  }, [loadNotebookData, showToast]);
+
+  const handleOpenFile = useCallback(async (path: string) => {
+    const res = await fetch("/api/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path }),
+    });
+    if (!res.ok) { showToast("Failed to open file"); return; }
+    const data = await res.json();
+    loadNotebookData(data);
+    showToast(`Opened ${data.fileName}`);
+  }, [loadNotebookData, showToast]);
+
+  const handleExportIpynb = useCallback(async () => {
+    const res = await fetch("/api/export/ipynb", { method: "POST" });
+    const data = await res.json();
+    showToast(`Exported to ${data.fileName}`);
+  }, [showToast]);
+
+  const handleExportYbk = useCallback(async () => {
+    const res = await fetch("/api/export/ybk", { method: "POST" });
+    const data = await res.json();
+    showToast(`Exported to ${data.fileName}`);
+  }, [showToast]);
+
+  const handleCutCell = useCallback(() => {
+    if (!focusedCellId) return;
+    const cell = cells.find((c) => c.id === focusedCellId);
+    if (cell) {
+      setClipboardCell({ ...cell });
+      handleDeleteCell(focusedCellId);
+    }
+  }, [focusedCellId, cells, handleDeleteCell]);
+
+  const handleCopyCell = useCallback(() => {
+    if (!focusedCellId) return;
+    const cell = cells.find((c) => c.id === focusedCellId);
+    if (cell) {
+      // Capture latest source from textarea
+      const ta = document.querySelector(`#cell-${cell.id} textarea`) as HTMLTextAreaElement | null;
+      const source = ta ? [ta.value] : cell.source;
+      setClipboardCell({ ...cell, source });
+    }
+  }, [focusedCellId, cells]);
+
+  const handlePasteCell = useCallback(async () => {
+    if (!clipboardCell) return;
+    const afterId = focusedCellId || undefined;
+    const res = await fetch("/api/cells/insert", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: clipboardCell.cell_type, source: clipboardCell.source.join(""), afterId }),
+    });
+    const { id } = await res.json();
+    const newCell: Cell = {
+      ...clipboardCell,
+      id,
+      outputs: clipboardCell.cell_type === "code" ? [] : [],
+      execution_count: null,
+    };
+    setCells((prev) => {
+      if (afterId) {
+        const idx = prev.findIndex((c) => c.id === afterId);
+        if (idx !== -1) {
+          const next = [...prev];
+          next.splice(idx + 1, 0, newCell);
+          return next;
+        }
+      }
+      return [...prev, newCell];
+    });
+    setSaved(true);
+  }, [clipboardCell, focusedCellId]);
+
+  const handleMenuRunCell = useCallback(() => {
+    if (!focusedCellId) return;
+    const ta = document.querySelector(`#cell-${focusedCellId} textarea`) as HTMLTextAreaElement | null;
+    const cell = cells.find((c) => c.id === focusedCellId);
+    if (cell && cell.cell_type === "code") {
+      const code = ta?.value ?? cell.source.join("\n");
+      handleRunCell(focusedCellId, code);
+    }
+  }, [focusedCellId, cells, handleRunCell]);
+
+  const handleRestartAndRunAll = useCallback(async () => {
+    await handleRestart();
+    await handleRunAll();
+  }, [handleRestart, handleRunAll]);
+
+  const FONT_SIZES = [12, 13, 14, 16];
+
+  const handleFontSizeIncrease = useCallback(() => {
+    setSettings((s) => {
+      const idx = FONT_SIZES.indexOf(s.editor.fontSize);
+      const next = idx < FONT_SIZES.length - 1 ? FONT_SIZES[idx + 1] : s.editor.fontSize;
+      const updated = { ...s, editor: { ...s.editor, fontSize: next } };
+      fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(updated) });
+      return updated;
+    });
+  }, []);
+
+  const handleFontSizeDecrease = useCallback(() => {
+    setSettings((s) => {
+      const idx = FONT_SIZES.indexOf(s.editor.fontSize);
+      const next = idx > 0 ? FONT_SIZES[idx - 1] : s.editor.fontSize;
+      const updated = { ...s, editor: { ...s.editor, fontSize: next } };
+      fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(updated) });
+      return updated;
+    });
+  }, []);
+
+  const handleToggleWordWrap = useCallback(() => {
+    setSettings((s) => {
+      const updated = { ...s, editor: { ...s.editor, wordWrap: !s.editor.wordWrap } };
+      fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(updated) });
+      return updated;
+    });
+  }, []);
+
   return (
     <>
       <div className="toolbar">
@@ -345,30 +506,48 @@ export function App() {
         <span className="save-indicator">
           {saved ? <><i className="bi bi-check-circle" /> Saved</> : <><i className="bi bi-pencil" /> Unsaved</>}
         </span>
-        <button className="toolbar-btn run-all-btn" onClick={handleRunAll} disabled={runningAll} title="Run all cells">
-          <i className={`bi ${runningAll ? "bi-hourglass-split" : "bi-play-fill"}`} /> {runningAll ? "Running..." : "Run All"}
-        </button>
-        <button className="restart-btn" onClick={handleRestart} title="Restart kernel">
-          <i className="bi bi-arrow-counterclockwise" /> Restart
-        </button>
-        <button className="toolbar-btn" onClick={toggleTheme} title="Toggle light/dark mode">
-          <i className={`bi ${theme === "light" ? "bi-moon-fill" : "bi-sun-fill"}`} />
-        </button>
-        <button className="toolbar-btn" onClick={() => setSettingsOpen(true)} title="Settings">
-          <i className="bi bi-gear" />
-        </button>
         <div className={`status ${connected ? "connected" : ""}`}>
           <i className={`bi ${connected ? "bi-wifi" : "bi-wifi-off"}`} /> {connected ? "ready" : "connecting..."}
         </div>
       </div>
+      <MenuBar
+        focusedCellId={focusedCellId}
+        cells={cells}
+        clipboardCell={clipboardCell}
+        runningAll={runningAll}
+        onNewNotebook={handleNewNotebook}
+        onOpenFile={handleOpenFile}
+        onSave={handleSave}
+        onExportIpynb={handleExportIpynb}
+        onExportYbk={handleExportYbk}
+        onCutCell={handleCutCell}
+        onCopyCell={handleCopyCell}
+        onPasteCell={handlePasteCell}
+        onDeleteCell={() => focusedCellId && handleDeleteCell(focusedCellId)}
+        onMoveCellUp={() => focusedCellId && handleMoveCell(focusedCellId, "up")}
+        onMoveCellDown={() => focusedCellId && handleMoveCell(focusedCellId, "down")}
+        onRunCell={handleMenuRunCell}
+        onRunAll={handleRunAll}
+        onRestart={handleRestart}
+        onRestartAndRunAll={handleRestartAndRunAll}
+        onToggleDarkMode={toggleTheme}
+        onFontSizeIncrease={handleFontSizeIncrease}
+        onFontSizeDecrease={handleFontSizeDecrease}
+        onToggleWordWrap={handleToggleWordWrap}
+        onShowShortcuts={() => setShortcutsOpen(true)}
+        onShowAbout={() => setAboutOpen(true)}
+      />
       <SettingsPanel
         open={settingsOpen}
         settings={settings}
         version={version}
         bunVersion={bunVersion}
+        fileFormat={fileFormat}
         onClose={() => setSettingsOpen(false)}
         onUpdate={handleUpdateSettings}
       />
+      <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+      <AboutModal open={aboutOpen} onClose={() => setAboutOpen(false)} version={version} bunVersion={bunVersion} />
       <NotebookView
         cells={cells}
         busyCells={busyCells}
@@ -381,6 +560,7 @@ export function App() {
         onAddCell={handleAddCell}
         onMoveCell={handleMoveCell}
       />
+      {toast && <div className="toast">{toast}</div>}
     </>
   );
 }
