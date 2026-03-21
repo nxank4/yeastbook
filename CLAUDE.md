@@ -1,8 +1,41 @@
 ## Branching Strategy
 
-- **`main`** — production branch. Only merge tested, stable code here.
-- **`staging`** — testing branch. All new features and fixes go here first for testing before merging to `main`.
-- Create feature branches off `staging`. PRs should target `staging` unless it's a hotfix for production.
+- **`main`** — production only, stable releases
+- **`staging`** — pre-production, testing
+- **`feature/<name>`** — one branch per feature, branched off staging
+- **`hotfix/<name>`** — urgent fixes branched off main
+
+### Rules
+- Never commit directly to main or staging
+- All feature work: create `feature/<name>` off staging
+- When feature done: merge into staging (with `--no-ff`)
+- When staging tested and stable: merge staging into main + tag release
+- Hotfixes: branch off main, merge back to both main AND staging
+
+### Commit Messages (Conventional Commits)
+- `feat:` new feature
+- `fix:` bug fix
+- `chore:` tooling, config
+- `docs:` documentation
+- `refactor:` code restructure
+- `test:` adding tests
+
+### Merge Strategy
+- Rebase before merging to keep history linear
+- No fast-forward merges to staging/main: use `--no-ff`
+- Squash commits on feature branch before merging if too many small commits
+
+### PR Checklist (before merging to staging)
+- `bun test` passes
+- `bun run build:ui` succeeds
+- Manual smoke test: `bun src/cli.ts new` works
+- No TypeScript errors
+
+## Release History
+
+- **P0 "Go Live"** — Core execution, binary build, npm publishing (on staging)
+- **P1 "Killer Features"** — Monaco Editor, %install magic command, rich output (on staging)
+- **P2 "Ecosystem"** — VS Code extension, Bun Shell + file watcher, plugin system (on staging)
 
 ---
 
