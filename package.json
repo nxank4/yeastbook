@@ -1,15 +1,30 @@
 {
   "name": "yeastbook",
   "version": "0.1.0",
+  "description": "Standalone TypeScript notebook powered by Bun",
   "module": "index.ts",
   "type": "module",
   "bin": {
     "yeastbook": "./src/cli.ts"
   },
+  "files": [
+    "dist/",
+    "src/",
+    "README.md"
+  ],
   "scripts": {
     "build:ui": "bun build src/ui/index.tsx --outdir dist --bundle --minify && cp src/ui/index.html dist/index.html",
-    "dev": "bun run build:ui && bun run src/cli.ts new"
+    "build:embed": "bun run scripts/embed-assets.ts",
+    "build:binary:mac": "bun build --compile src/cli.ts --outfile binaries/yeastbook-macos",
+    "build:binary:linux": "bun build --compile src/cli.ts --outfile binaries/yeastbook-linux",
+    "build:binary:windows": "bun build --compile src/cli.ts --outfile binaries/yeastbook-windows.exe",
+    "build:all": "bun run build:ui && bun run build:embed && bun run build:binary:linux",
+    "build:npm": "bun build src/cli.ts --outdir dist --target node",
+    "dev": "bun run build:ui && bun run src/cli.ts new",
+    "test": "bun test"
   },
+  "keywords": ["bun", "typescript", "notebook", "jupyter", "repl"],
+  "license": "MIT",
   "devDependencies": {
     "@types/bun": "latest",
     "@types/dompurify": "^3.2.0",
