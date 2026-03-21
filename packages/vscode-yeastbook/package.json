@@ -2,7 +2,7 @@
   "name": "vscode-yeastbook",
   "displayName": "Yeastbook",
   "description": "TypeScript notebooks powered by Bun",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "publisher": "yeastbook",
   "engines": { "vscode": "^1.85.0" },
   "categories": ["Notebooks"],

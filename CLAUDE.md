@@ -31,11 +31,21 @@
 - Manual smoke test: `bun src/cli.ts new` works
 - No TypeScript errors
 
-## Release History
+## Versioning
 
-- **P0 "Go Live"** — Core execution, binary build, npm publishing (on staging)
-- **P1 "Killer Features"** — Monaco Editor, %install magic command, rich output (on staging)
-- **P2 "Ecosystem"** — VS Code extension, Bun Shell + file watcher, plugin system (on staging)
+- `0.0.x` — internal dev, not usable by others
+- `0.x.0` — public beta, usable but not stable
+- `1.0.0` — stable MVP, production-ready
+
+### MVP Checklist (before 0.1.0)
+- [ ] `bunx yeastbook new` works on a stranger's machine
+- [ ] No crash during normal usage
+- [ ] README sufficient for new users
+- [ ] At least 1-2 external testers confirm usable
+- [ ] Binary builds on Linux + Mac
+
+### Release History
+- **0.0.1** (current) — P0 core execution + P1 Monaco/rich output + P2 ecosystem (internal dev)
 
 ---
 
