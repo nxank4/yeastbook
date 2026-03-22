@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { Portal } from "./Portal.tsx";
 
 interface Command {
   id: string;
@@ -52,6 +53,7 @@ export function CommandPalette({ open, onClose, commands }: Props) {
   if (!open) return null;
 
   return (
+    <Portal>
     <div className="palette-overlay" onClick={onClose}>
       <div className="palette" onClick={(e) => e.stopPropagation()}>
         <input
@@ -78,5 +80,6 @@ export function CommandPalette({ open, onClose, commands }: Props) {
         </div>
       </div>
     </div>
+    </Portal>
   );
 }

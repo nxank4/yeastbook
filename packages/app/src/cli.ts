@@ -3,8 +3,10 @@
 
 import { resolve, basename, dirname, join } from "node:path";
 import { unlink, mkdir } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { startServer } from "./server.ts";
+import { listNotebooks } from "./dashboard.ts";
 import { loadNotebook, saveNotebook, ybkToIpynb, ipynbToYbk, createEmptyYbk } from "@yeastbook/core";
 import type { IpynbNotebook } from "@yeastbook/core";
 
@@ -84,6 +86,53 @@ function printUsage(): void {
   console.log("  --no-open     Do not open browser after starting server");
   console.log("  --ipynb       Use .ipynb format (with `new` command)");
   console.log("  --dev         Dev mode: serve from dist/, watch for UI changes");
+}
+
+const DEV_NOTEBOOK_FILE = resolve(".yeastbook-dev-notebook");
+
+async function promptDevNotebook(): Promise<string | null> {
+  // On --watch restart, reuse the previously chosen notebook
+  try {
+    const saved = await Bun.file(DEV_NOTEBOOK_FILE).text();
+    const trimmed = saved.trim();
+    if (trimmed && existsSync(trimmed)) {
+      return trimmed;
+    }
+  } catch {}
+
+  const notebooks = await listNotebooks(process.cwd());
+  if (notebooks.length === 0) return null;
+
+  console.log("\nExisting notebooks in current directory:");
+  notebooks.forEach((nb, i) => {
+    const size = (nb.size / 1024).toFixed(1);
+    console.log(`  ${i + 1}. ${nb.name} (${size} KB)`);
+  });
+  console.log(`  ${notebooks.length + 1}. Create new notebook`);
+  console.log("");
+
+  process.stdout.write("Choose [1]: ");
+  const response = await new Promise<string>((resolve) => {
+    const stdin = process.stdin;
+    stdin.resume();
+    stdin.setEncoding("utf8");
+    stdin.once("data", (data: string) => {
+      stdin.pause();
+      resolve(data.trim());
+    });
+  });
+
+  const choice = parseInt(response || "1", 10);
+  let chosen: string | null = null;
+  if (choice >= 1 && choice <= notebooks.length) {
+    chosen = notebooks[choice - 1].path;
+  }
+
+  // Save choice so --watch restarts don't re-prompt
+  if (chosen) {
+    await Bun.write(DEV_NOTEBOOK_FILE, chosen);
+  }
+  return chosen;
 }
 
 async function findFreePort(start = 3000): Promise<number> {
@@ -210,34 +259,34 @@ async function handlePlugin(subArgs: string[]): Promise<void> {
 const { positional, port, noOpen, ipynb, dev } = parseFlags(process.argv.slice(2));
 const command = positional[0];
 
-if (!command) {
+if (!command || command === "new") {
   await checkWritePermission();
-  const filePath = resolve(`notebook-${Date.now()}.ybk`);
-  const actualPort = await findFreePort(port);
-  const server = await startServer(filePath, actualPort, dev);
-  console.log(`Yeastbook running at http://localhost:${server.port}`);
-  console.log(`  Dashboard: /api/dashboard/files`);
-  console.log(`  Notebook: ${filePath}`);
-  process.on("SIGINT", () => {
-    console.log("\nShutting down yeastbook...");
-    server.stop();
-    process.exit(0);
-  });
-}
 
-if (command === "new") {
-  await checkWritePermission();
-  const ext = ipynb ? ".ipynb" : ".ybk";
-  const filePath = resolve(`notebook-${Date.now()}${ext}`);
-  console.log(`Creating new notebook: ${filePath}`);
+  let filePath: string;
+  if (dev) {
+    const existing = await promptDevNotebook();
+    if (existing) {
+      filePath = existing;
+      console.log(`Opening notebook: ${filePath}`);
+    } else {
+      const ext = ipynb ? ".ipynb" : ".ybk";
+      filePath = resolve(`notebook-${Date.now()}${ext}`);
+      console.log(`Creating new notebook: ${filePath}`);
+    }
+  } else {
+    const ext = ipynb ? ".ipynb" : ".ybk";
+    filePath = resolve(`notebook-${Date.now()}${ext}`);
+    console.log(`Creating new notebook: ${filePath}`);
+  }
 
   const actualPort = await findFreePort(port);
   const server = await startServer(filePath, actualPort, dev);
   console.log(`Yeastbook running at http://localhost:${server.port}`);
   console.log(`Notebook: ${filePath}`);
-  process.on("SIGINT", () => {
+  process.on("SIGINT", async () => {
     console.log("\nShutting down yeastbook...");
     server.stop();
+    if (dev) try { await unlink(DEV_NOTEBOOK_FILE); } catch {}
     process.exit(0);
   });
 } else if (command === "export") {

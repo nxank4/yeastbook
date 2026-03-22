@@ -1,3 +1,7 @@
+import { useEffect, useRef, useState } from "react";
+import { draggable, dropTargetForElements, monitorForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
+import { setCustomNativeDragPreview } from "@atlaskit/pragmatic-drag-and-drop/element/set-custom-native-drag-preview";
+import { attachClosestEdge, extractClosestEdge, type Edge } from "@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge";
 import { CodeCell } from "./CodeCell.tsx";
 import { MarkdownCell } from "./MarkdownCell.tsx";
 import type { Cell, CellOutput, Settings } from "@yeastbook/core";
@@ -18,55 +22,195 @@ interface Props {
   onDeleteCell: (cellId: string) => void;
   onClearOutput: (cellId: string) => void;
   onUpdateMarkdown: (cellId: string, source: string) => void;
+  isPresenting?: boolean;
   onAddCell: (type: "code" | "markdown") => void;
   onMoveCell: (cellId: string, direction: "up" | "down") => void;
+  onRunAllAbove: (cellId: string) => void;
+  onRunAllBelow: (cellId: string) => void;
+  onInterrupt: () => void;
+  onChangeCellType: (type: "code" | "markdown", cellId: string) => void;
+  onInsertCellAt: (type: "code" | "markdown", position: "above" | "below", targetCellId: string) => void;
+  onCutCell: (cellId: string) => void;
+  onCopyCell: (cellId: string) => void;
+  onPasteCellBelow: (afterCellId: string) => void;
+  hasClipboard: boolean;
+  onRunAll: () => void;
+  onHistoryPush: (entry: any) => void;
+  onReorderCell: (cellId: string, toIndex: number) => void;
+  onSave: () => void;
+  onOpenPalette: () => void;
+}
+
+function DraggableCell({ cellId, index, children, isPresenting }: {
+  cellId: string;
+  index: number;
+  children: (dragHandleRef: React.RefObject<HTMLDivElement | null>) => React.ReactNode;
+  isPresenting?: boolean;
+}) {
+  const cellRef = useRef<HTMLDivElement>(null);
+  const dragHandleRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [closestEdge, setClosestEdge] = useState<Edge | null>(null);
+
+  useEffect(() => {
+    const el = cellRef.current;
+    const handle = dragHandleRef.current;
+    if (!el || !handle || isPresenting) return;
+
+    const cleanupDrag = draggable({
+      element: el,
+      dragHandle: handle,
+      getInitialData: () => ({ cellId, index }),
+      onGenerateDragPreview: ({ nativeSetDragImage }) => {
+        setCustomNativeDragPreview({
+          nativeSetDragImage,
+          render({ container }) {
+            const preview = document.createElement("div");
+            preview.style.cssText = "padding:8px 16px;background:var(--bg-surface,#fdfcfa);border:1px solid var(--border-subtle,#e8e2d9);border-radius:8px;font-size:13px;color:var(--text-secondary,#6b6560);box-shadow:0 4px 12px rgba(0,0,0,0.12);font-family:Inter,sans-serif;white-space:nowrap;";
+            preview.textContent = "Moving cell...";
+            container.appendChild(preview);
+          },
+        });
+      },
+      onDragStart: () => setIsDragging(true),
+      onDrop: () => setIsDragging(false),
+    });
+
+    const cleanupDrop = dropTargetForElements({
+      element: el,
+      getData: ({ input, element }) =>
+        attachClosestEdge({ cellId, index }, { input, element, allowedEdges: ["top", "bottom"] }),
+      onDragEnter: ({ self }) => setClosestEdge(extractClosestEdge(self.data)),
+      onDrag: ({ self }) => setClosestEdge(extractClosestEdge(self.data)),
+      onDragLeave: () => setClosestEdge(null),
+      onDrop: () => setClosestEdge(null),
+    });
+
+    return () => { cleanupDrag(); cleanupDrop(); };
+  }, [cellId, index, isPresenting]);
+
+  return (
+    <div
+      ref={cellRef}
+      className={`draggable-cell ${isDragging ? "dragging" : ""}`}
+      style={{ position: "relative" }}
+    >
+      {closestEdge === "top" && <div className="drop-indicator drop-indicator-top" />}
+      {children(dragHandleRef)}
+      {closestEdge === "bottom" && <div className="drop-indicator drop-indicator-bottom" />}
+    </div>
+  );
 }
 
 export function NotebookView({
   cells, busyCells, liveOutputs, settings, installStates,
-  mode, focusedCellId, onModeChange,
+  mode, focusedCellId, isPresenting, onModeChange,
   onRunCell, onRunAndAdvance, onSourceChange, onDeleteCell, onClearOutput, onUpdateMarkdown, onAddCell, onMoveCell,
+  onRunAllAbove, onRunAllBelow, onInterrupt, onChangeCellType,
+  onInsertCellAt, onCutCell, onCopyCell, onPasteCellBelow, hasClipboard, onRunAll, onHistoryPush, onReorderCell,
+  onSave, onOpenPalette,
 }: Props) {
+  useEffect(() => {
+    return monitorForElements({
+      onDrop({ source, location }) {
+        const target = location.current.dropTargets[0];
+        if (!target) return;
+        const sourceId = source.data.cellId as string;
+        const targetId = target.data.cellId as string;
+        if (sourceId === targetId) return;
+
+        const edge = extractClosestEdge(target.data);
+        const sourceIndex = cells.findIndex((c) => c.id === sourceId);
+        const targetIndex = cells.findIndex((c) => c.id === targetId);
+        if (sourceIndex === -1 || targetIndex === -1) return;
+
+        let newIndex = edge === "top" ? targetIndex : targetIndex + 1;
+        // Adjust if moving down (source removal shifts indices)
+        if (sourceIndex < newIndex) newIndex--;
+        if (sourceIndex !== newIndex) {
+          onReorderCell(sourceId, newIndex);
+        }
+      },
+    });
+  }, [cells, onReorderCell]);
+
   return (
-    <div className="notebook">
-      {cells.map((cell, idx) =>
-        cell.cell_type === "code" ? (
-          <CodeCell
-            key={cell.id}
-            cell={cell}
-            busy={busyCells.has(cell.id)}
-            liveOutputs={liveOutputs.get(cell.id) || []}
-            theme={settings.appearance.theme}
-            fontSize={settings.editor.fontSize}
-            tabSize={settings.editor.tabSize}
-            wordWrap={settings.editor.wordWrap}
-            installing={installStates.get(cell.id)}
-            isCommandFocused={mode === "command" && focusedCellId === cell.id}
-            onModeChange={onModeChange}
-            onRun={onRunCell}
-            onRunAndAdvance={onRunAndAdvance}
-            onSourceChange={onSourceChange}
-            onDelete={onDeleteCell}
-            onClear={onClearOutput}
-            onMoveUp={idx > 0 ? () => onMoveCell(cell.id, "up") : undefined}
-            onMoveDown={idx < cells.length - 1 ? () => onMoveCell(cell.id, "down") : undefined}
-          />
-        ) : (
-          <MarkdownCell
-            key={cell.id}
-            cell={cell}
-            onUpdate={onUpdateMarkdown}
-            onDelete={onDeleteCell}
-            onMoveUp={idx > 0 ? () => onMoveCell(cell.id, "up") : undefined}
-            onMoveDown={idx < cells.length - 1 ? () => onMoveCell(cell.id, "down") : undefined}
-          />
-        )
+    <div className={`notebook ${isPresenting ? "presentation-mode" : ""}`}>
+      {cells.map((cell, idx) => (
+        <div key={cell.id} className="cell-wrapper" data-type={cell.cell_type}>
+          {cell.cell_type === "code" && (
+            <span className="cell-exec-count">
+              {busyCells.has(cell.id) && <span className="busy-indicator" />}
+              {cell.execution_count ? `[${cell.execution_count}]` : "[ ]"}
+            </span>
+          )}
+          <DraggableCell cellId={cell.id} index={idx} isPresenting={isPresenting}>
+          {(dragHandleRef) =>
+            <div>
+              {cell.cell_type === "code" ? (
+                <CodeCell
+                  cell={cell}
+                  busy={busyCells.has(cell.id)}
+                  liveOutputs={liveOutputs.get(cell.id) || []}
+                  theme={settings.appearance.theme}
+                  fontSize={settings.editor.fontSize}
+                  tabSize={settings.editor.tabSize}
+                  wordWrap={settings.editor.wordWrap}
+                  installing={installStates.get(cell.id)}
+                  isCommandFocused={mode === "command" && focusedCellId === cell.id}
+                  isPresenting={isPresenting}
+                  dragHandleRef={dragHandleRef}
+                  onModeChange={onModeChange}
+                  onRun={onRunCell}
+                  onRunAndAdvance={onRunAndAdvance}
+                  onSourceChange={onSourceChange}
+                  onDelete={onDeleteCell}
+                  onClear={onClearOutput}
+                  onMoveUp={idx > 0 ? () => onMoveCell(cell.id, "up") : undefined}
+                  onMoveDown={idx < cells.length - 1 ? () => onMoveCell(cell.id, "down") : undefined}
+                  onRunAllAbove={() => onRunAllAbove(cell.id)}
+                  onRunAllBelow={() => onRunAllBelow(cell.id)}
+                  onInterrupt={onInterrupt}
+                  onChangeType={() => onChangeCellType("markdown", cell.id)}
+                  onHistoryPush={onHistoryPush}
+                  onRunAll={onRunAll}
+                  onSave={onSave}
+                  onOpenPalette={onOpenPalette}
+                  onCut={() => onCutCell(cell.id)}
+                  onCopy={() => onCopyCell(cell.id)}
+                  onPasteBelow={() => onPasteCellBelow(cell.id)}
+                  hasClipboard={hasClipboard}
+                  onInsertAbove={(type) => onInsertCellAt(type, "above", cell.id)}
+                  onInsertBelow={(type) => onInsertCellAt(type, "below", cell.id)}
+                />
+              ) : (
+                <MarkdownCell
+                  cell={cell}
+                  isPresenting={isPresenting}
+                  dragHandleRef={dragHandleRef}
+                  onUpdate={onUpdateMarkdown}
+                  onDelete={onDeleteCell}
+                  onMoveUp={idx > 0 ? () => onMoveCell(cell.id, "up") : undefined}
+                  onMoveDown={idx < cells.length - 1 ? () => onMoveCell(cell.id, "down") : undefined}
+                  onChangeType={() => onChangeCellType("code", cell.id)}
+                  onCopy={() => onCopyCell(cell.id)}
+                  onInsertBelow={(type) => onInsertCellAt(type, "below", cell.id)}
+                />
+              )}
+            </div>
+          }
+        </DraggableCell>
+        </div>
+      ))}
+      {!isPresenting && (
+        <>
+          <div className="add-cell-bar">
+            <button onClick={() => onAddCell("code")}><i className="bi bi-code-slash" /> Code</button>
+            <button onClick={() => onAddCell("markdown")}><i className="bi bi-markdown" /> Markdown</button>
+          </div>
+          <div className="shortcut-hint">Shift+Enter to run &amp; advance / Ctrl+Enter to run</div>
+        </>
       )}
-      <div className="add-cell-bar">
-        <button onClick={() => onAddCell("code")}><i className="bi bi-code-slash" /> Code</button>
-        <button onClick={() => onAddCell("markdown")}><i className="bi bi-markdown" /> Markdown</button>
-      </div>
-      <div className="shortcut-hint">Shift+Enter to run &amp; advance / Ctrl+Enter to run</div>
     </div>
   );
 }

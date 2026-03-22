@@ -108,10 +108,21 @@ export class Notebook {
     if (cell) cell.source = [source];
   }
 
+  updateCellType(id: string, type: "code" | "markdown"): void {
+    const cell = this.cells.find((c) => c.id === id);
+    if (cell) {
+      cell.cell_type = type;
+      if (type === "markdown") {
+        cell.outputs = [];
+        cell.execution_count = null;
+      }
+    }
+  }
+
   setCellOutput(
     id: string,
     executionCount: number,
-    result: { value?: string; stdout?: string; stderr?: string; error?: { ename: string; evalue: string; traceback: string[] } },
+    result: { value?: string; stdout?: string; stderr?: string; error?: { ename: string; evalue: string; traceback: string[] }; richOutput?: Record<string, unknown>; tables?: Record<string, unknown>[] },
   ): void {
     const cell = this.cells.find((c) => c.id === id);
     if (!cell) return;
@@ -124,6 +135,15 @@ export class Notebook {
     if (result.stderr) {
       cell.outputs.push({ output_type: "stream", name: "stderr", text: [result.stderr] });
     }
+    if (result.tables && result.tables.length > 0) {
+      cell.outputs.push({
+        output_type: "execute_result",
+        data: { "text/plain": "" },
+        metadata: {},
+        execution_count: executionCount,
+        richOutput: { type: "table", rows: result.tables },
+      } as any);
+    }
     if (result.error) {
       cell.outputs.push({
         output_type: "error",
@@ -132,12 +152,14 @@ export class Notebook {
         traceback: result.error.traceback,
       });
     } else if (result.value !== undefined) {
-      cell.outputs.push({
+      const output: any = {
         output_type: "execute_result",
         data: { "text/plain": result.value },
         metadata: {},
         execution_count: executionCount,
-      });
+      };
+      if (result.richOutput) output.richOutput = result.richOutput;
+      cell.outputs.push(output);
     }
   }
 
@@ -147,6 +169,13 @@ export class Notebook {
     const target = direction === "up" ? idx - 1 : idx + 1;
     if (target < 0 || target >= this.cells.length) return;
     [this.cells[idx], this.cells[target]] = [this.cells[target], this.cells[idx]];
+  }
+
+  reorderCell(id: string, toIndex: number): void {
+    const fromIndex = this.cells.findIndex((c) => c.id === id);
+    if (fromIndex === -1 || toIndex < 0 || toIndex >= this.cells.length) return;
+    const [cell] = this.cells.splice(fromIndex, 1);
+    this.cells.splice(toIndex, 0, cell);
   }
 
   getCell(id: string): Cell | undefined {

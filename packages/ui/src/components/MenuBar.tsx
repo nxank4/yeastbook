@@ -61,14 +61,22 @@ interface Props {
   onMoveCellDown: () => void;
   onRunCell: () => void;
   onRunAll: () => void;
+  onRunAllAbove: () => void;
+  onRunAllBelow: () => void;
+  onInterrupt: () => void;
   onRestart: () => void;
   onRestartAndRunAll: () => void;
   onToggleDarkMode: () => void;
+  onTogglePresentation: () => void;
   onFontSizeIncrease: () => void;
   onFontSizeDecrease: () => void;
   onToggleWordWrap: () => void;
   onShowShortcuts: () => void;
   onShowAbout: () => void;
+  onUndo: () => void;
+  onRedo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
 }
 
 export function MenuBar(props: Props) {
@@ -115,6 +123,9 @@ export function MenuBar(props: Props) {
     {
       label: "Edit",
       items: [
+        { label: "Undo", action: props.onUndo, shortcut: "Ctrl+Z", disabled: !props.canUndo },
+        { label: "Redo", action: props.onRedo, shortcut: "Ctrl+Y", disabled: !props.canRedo },
+        { separator: true },
         { label: "Cut Cell", action: props.onCutCell, disabled: !hasFocus },
         { label: "Copy Cell", action: props.onCopyCell, disabled: !hasFocus },
         { label: "Paste Cell Below", action: props.onPasteCell, disabled: !props.clipboardCell },
@@ -128,8 +139,14 @@ export function MenuBar(props: Props) {
     {
       label: "Run",
       items: [
-        { label: "Run Cell", action: props.onRunCell, shortcut: "Shift+Enter", disabled: !hasFocus },
+        { label: "Run Cell", action: props.onRunCell, shortcut: "Ctrl+Enter", disabled: !hasFocus },
+        { label: "Run Cell & Advance", action: props.onRunCell, shortcut: "Shift+Enter", disabled: !hasFocus },
+        { separator: true },
+        { label: "Run All Above", action: props.onRunAllAbove, disabled: !hasFocus || props.runningAll },
+        { label: "Run All Below", action: props.onRunAllBelow, disabled: !hasFocus || props.runningAll },
         { label: "Run All", action: props.onRunAll, disabled: props.runningAll },
+        { separator: true },
+        { label: "Interrupt Execution", action: props.onInterrupt, shortcut: "I I" },
         { separator: true },
         { label: "Restart Kernel", action: props.onRestart },
         { label: "Restart & Run All", action: props.onRestartAndRunAll },
@@ -138,6 +155,8 @@ export function MenuBar(props: Props) {
     {
       label: "View",
       items: [
+        { label: "Presentation Mode", action: props.onTogglePresentation, shortcut: "Ctrl+Shift+E" },
+        { separator: true },
         { label: "Toggle Dark Mode", action: props.onToggleDarkMode },
         { separator: true },
         { label: "Font Size: Increase", action: props.onFontSizeIncrease },
@@ -216,6 +235,8 @@ export function ShortcutsModal({ open, onClose }: ShortcutsModalProps) {
     ["Ctrl+S", "Save"],
     ["Ctrl+Z", "Undo (native)"],
     ["Escape", "Deselect cell"],
+    ["I I", "Interrupt execution"],
+    ["Ctrl+Shift+E", "Toggle presentation mode"],
   ];
   return (
     <div className="modal-overlay" onClick={onClose}>

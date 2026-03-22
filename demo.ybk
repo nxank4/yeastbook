@@ -1,0 +1,218 @@
+{
+  "nbformat": 4,
+  "nbformat_minor": 5,
+  "metadata": {
+    "kernelspec": {
+      "name": "yeastbook",
+      "display_name": "Yeastbook (Bun)",
+      "language": "typescript"
+    },
+    "language_info": {
+      "name": "typescript"
+    }
+  },
+  "cells": [
+    {
+      "id": "demo-header",
+      "type": "markdown",
+      "source": "# Yeastbook Demo\nA tour of features — run each cell with Shift+Enter"
+    },
+    {
+      "id": "demo-01-basic",
+      "type": "code",
+      "source": "const greeting = \"Hello from Yeastbook \\ud83c\\udf5e\"\nconst version = Bun.version\nconsole.log(greeting)\nconsole.log(\"Bun version:\", version)",
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Hello from Yeastbook 🍞\nBun version: 1.3.11\n"
+          ]
+        }
+      ],
+      "executionCount": 2
+    },
+    {
+      "id": "demo-02-context",
+      "type": "code",
+      "source": "// Variable greeting from cell 1 persists\ngreeting + \" \\u2014 context works!\"",
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": "\"Hello from Yeastbook 🍞 — context works!\""
+          },
+          "metadata": {},
+          "execution_count": 3,
+          "richOutput": {
+            "type": "text",
+            "text": "Hello from Yeastbook 🍞 — context works!"
+          }
+        }
+      ],
+      "executionCount": 3
+    },
+    {
+      "id": "demo-03-await",
+      "type": "code",
+      "source": "const res = await fetch(\"https://jsonplaceholder.typicode.com/todos/1\")\nconst todo = await res.json()\ntodo",
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": "{\n  userId: 1,\n  id: 1,\n  title: \"delectus aut autem\",\n  completed: false,\n}"
+          },
+          "metadata": {},
+          "execution_count": 5,
+          "richOutput": {
+            "type": "json",
+            "data": {
+              "userId": 1,
+              "id": 1,
+              "title": "delectus aut autem",
+              "completed": false
+            }
+          }
+        }
+      ],
+      "executionCount": 5
+    },
+    {
+      "id": "demo-04-table",
+      "type": "code",
+      "source": "const users = [\n  { name: \"Alice\", age: 30, role: \"admin\" },\n  { name: \"Bob\", age: 25, role: \"user\" },\n  { name: \"Charlie\", age: 35, role: \"user\" },\n]\nusers",
+      "outputs": [],
+      "executionCount": null
+    },
+    {
+      "id": "demo-05-chart",
+      "type": "code",
+      "source": "({\n  __type: \"chart\",\n  data: [12, 19, 8, 15, 22, 18, 25],\n  config: {\n    chartType: \"line\",\n    label: \"Weekly activity\",\n    title: \"User Activity Q1\"\n  }\n})",
+      "outputs": [],
+      "executionCount": 5
+    },
+    {
+      "id": "demo-06-console-table",
+      "type": "code",
+      "source": "console.table([\n  { method: \"GET\", endpoint: \"/api/users\", ms: 12 },\n  { method: \"POST\", endpoint: \"/api/login\", ms: 45 },\n  { method: \"DELETE\", endpoint: \"/api/session\", ms: 8 },\n])",
+      "outputs": [],
+      "executionCount": 1
+    },
+    {
+      "id": "demo-07-shell",
+      "type": "code",
+      "source": "const files = await $`ls -la`.text()\nconsole.log(files)",
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "drwxr-xr-x  10  1000  1000    +4096 Mar 21 18:42 .\ndrwxrwxrwx   8  1000  1000    +4096 Mar 20 14:26 ..\ndrwxr-xr-x   6  1000  1000    +4096 Mar 21 14:11 packages\ndrwxr-xr-x   2  1000  1000    +4096 Mar 21 18:44 tests\n-rw-r--r--   1  1000  1000    +7977 Mar 21 18:10 bun.lock\n-rw-r--r--   1  1000  1000    +7302 Mar 21 18:11 demo.ipynb\n-rw-r--r--   1  1000  1000    +3101 Mar 21 13:30 CLAUDE.md\n-rw-r--r--   1  1000  1000     +440 Mar 21 17:30 .gitignore\ndrwxr-xr-x   2  1000  1000    +4096 Mar 21 14:11 scripts\n-rw-r--r--   1  1000  1000     +281 Mar 21 17:30 notebook-1774114233945.ybk\ndrwxr-xr-x   6  1000  1000    +4096 Mar 21 17:49 node_modules\n-rw-r--r--   1  1000  1000    +8452 Mar 21 18:48 demo.ybk\ndrwxr-xr-x   3  1000  1000    +4096 Mar 20 14:26 docs\n-rw-r--r--   1  1000  1000    +1876 Mar 21 08:39 README.md\n-rw-r--r--   1  1000  1000    +1107 Mar 21 17:49 package.json\ndrwxr-xr-x   8  1000  1000    +4096 Mar 21 17:00 .git\ndrwxr-xr-x   2  1000  1000    +4096 Mar 21 17:48 .claude\n-rw-r--r--   1  1000  1000      +40 Mar 21 17:34 .yeastbook-dev-notebook\ndrwxr-xr-x   2  1000  1000    +4096 Mar 21 15:41 binaries\n-rw-r--r--   1  1000  1000     +151 Mar 21 08:38 .npmignore\n-rw-r--r--   1  1000  1000     +713 Mar 20 14:26 tsconfig.json\n-rw-r--r--   1  1000  1000      +30 Mar 20 14:26 index.ts\n-rw-r--r--   1  1000  1000     +261 Mar 21 07:19 install\n\n"
+          ]
+        }
+      ],
+      "executionCount": 7
+    },
+    {
+      "id": "demo-08-isolation",
+      "type": "code",
+      "source": "// Server must survive this\nprocess.exit(1)",
+      "outputs": [
+        {
+          "output_type": "error",
+          "ename": "ProcessExitError",
+          "evalue": "Cell called process.exit(1) — kernel restart required",
+          "traceback": [
+            "Cell attempted to exit the process. Use Restart Kernel to reset."
+          ]
+        }
+      ],
+      "executionCount": 8
+    },
+    {
+      "id": "demo-09-widget",
+      "type": "code",
+      "source": "const slider = createSlider({ min: 0, max: 100, value: 50, label: \"Threshold\" })\nslider",
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": "{\n  value: 50,\n  __widgetId: \"widget_1_1774119225943\",\n  __type: \"widget\",\n  __widgetType: \"slider\",\n  __config: {\n    min: 0,\n    max: 100,\n    step: 1,\n    label: \"Threshold\",\n  },\n  _callbacks: [],\n  onChange: [Function: onChange],\n  destroy: [Function: destroy],\n}"
+          },
+          "metadata": {},
+          "execution_count": 3
+        }
+      ],
+      "executionCount": 3
+    },
+    {
+      "id": "demo-10-install",
+      "type": "code",
+      "source": "%install lodash",
+      "outputs": [],
+      "executionCount": null
+    },
+    {
+      "id": "demo-10b-lodash",
+      "type": "code",
+      "source": "import _ from \"lodash\"\n_.chunk([1,2,3,4,5,6], 2)",
+      "outputs": [
+        {
+          "output_type": "error",
+          "ename": "SyntaxError",
+          "evalue": "Unexpected identifier '_'. import call expects one or two arguments.",
+          "traceback": [
+            "SyntaxError: Unexpected identifier '_'. import call expects one or two arguments.",
+            "    at <parse> (:4)",
+            "    at AsyncFunction (unknown)",
+            "    at executeCode (/home/nxank4/personal/yeastbook/packages/app/src/kernel/execute.ts:83:20)",
+            "    at message (/home/nxank4/personal/yeastbook/packages/app/src/server.ts:524:36)"
+          ]
+        }
+      ],
+      "executionCount": 10
+    },
+    {
+      "id": "demo-11-perf",
+      "type": "code",
+      "source": "const start = performance.now()\nlet sum = 0\nfor (let i = 0; i < 10_000_000; i++) sum += i\nconst end = performance.now()\nconsole.log(`10M iterations: ${(end - start).toFixed(2)}ms`)\nconsole.log(`Sum: ${sum}`)",
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "10M iterations: 18.36ms\nSum: 49999995000000\n"
+          ]
+        }
+      ],
+      "executionCount": 11
+    },
+    {
+      "id": "demo-12-error",
+      "type": "code",
+      "source": "undefinedVariable.foo",
+      "outputs": [
+        {
+          "output_type": "error",
+          "ename": "ReferenceError",
+          "evalue": "undefinedVariable is not defined",
+          "traceback": [
+            "ReferenceError: undefinedVariable is not defined",
+            "    at <anonymous> (file:///home/nxank4/personal/yeastbook/packages/app/src/kernel/execute.ts:4:26)",
+            "    at anonymous (file:///home/nxank4/personal/yeastbook/packages/app/src/kernel/execute.ts:5:3)",
+            "    at executeCode (/home/nxank4/personal/yeastbook/packages/app/src/kernel/execute.ts:88:7)",
+            "    at message (/home/nxank4/personal/yeastbook/packages/app/src/server.ts:524:36)"
+          ]
+        }
+      ],
+      "executionCount": 12
+    },
+    {
+      "id": "demo-13-svg",
+      "type": "code",
+      "source": "({\n  __mime: \"image/svg+xml\",\n  data: `<svg width=\"200\" height=\"100\" xmlns=\"http://www.w3.org/2000/svg\">\n    <rect width=\"200\" height=\"100\" fill=\"#F7F4EF\"/>\n    <circle cx=\"50\" cy=\"50\" r=\"30\" fill=\"#D97706\"/>\n    <text x=\"100\" y=\"55\" font-family=\"Inter\" font-size=\"16\" fill=\"#1A1714\">Yeastbook</text>\n  </svg>`\n})",
+      "outputs": [],
+      "executionCount": 19
+    }
+  ]
+}

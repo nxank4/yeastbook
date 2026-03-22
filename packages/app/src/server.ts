@@ -5,7 +5,7 @@ import { homedir } from "node:os";
 import { rename, mkdir } from "node:fs/promises";
 import { existsSync, watch as fsWatch } from "node:fs";
 import { assets } from "./assets.ts";
-import { executeCode } from "./kernel/execute.ts";
+import { executeCode, interruptExecution } from "./kernel/execute.ts";
 import { installPackages } from "./kernel/installer.ts";
 import { watchNotebook, createOwnWriteMarker } from "./watcher.ts";
 import { PluginLoader } from "./plugins/loader.ts";
@@ -28,6 +28,7 @@ async function loadSettings(): Promise<Settings> {
         appearance: { ...DEFAULT_SETTINGS.appearance, ...data.appearance },
         execution: { ...DEFAULT_SETTINGS.execution, ...data.execution },
         ai: { ...DEFAULT_SETTINGS.ai, ...data.ai },
+        layout: { ...DEFAULT_SETTINGS.layout, ...data.layout },
       };
     }
   } catch {}
@@ -37,6 +38,27 @@ async function loadSettings(): Promise<Settings> {
 async function saveSettings(settings: Settings): Promise<void> {
   await mkdir(SETTINGS_DIR, { recursive: true });
   await Bun.write(SETTINGS_FILE, JSON.stringify(settings, null, 2));
+}
+
+async function loadEnvFile(notebookPath: string): Promise<Record<string, string>> {
+  const envPath = resolve(dirname(notebookPath), ".env");
+  const envVars: Record<string, string> = {};
+  try {
+    const content = await Bun.file(envPath).text();
+    for (const line of content.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const eqIdx = trimmed.indexOf("=");
+      if (eqIdx === -1) continue;
+      const key = trimmed.slice(0, eqIdx).trim();
+      let value = trimmed.slice(eqIdx + 1).trim();
+      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+        value = value.slice(1, -1);
+      }
+      envVars[key] = value;
+    }
+  } catch {}
+  return envVars;
 }
 
 interface ServerState {
@@ -68,6 +90,15 @@ export async function startServer(filePath: string, port: number = 3000, devMode
   try {
     pluginLoader.registerPlugin((await import("./plugins/builtin/vega.ts")).default);
   } catch {}
+
+  // Load .env from notebook directory into process.env
+  let envKeys: string[] = [];
+  async function reloadEnv() {
+    const vars = await loadEnvFile(absPath);
+    Object.assign(process.env, vars);
+    envKeys = Object.keys(vars);
+  }
+  await reloadEnv();
 
   const state: ServerState = {
     notebook,
@@ -192,8 +223,13 @@ export async function startServer(filePath: string, port: number = 3000, devMode
           return Response.json({ ok: true });
         },
         PATCH: async (req) => {
-          const body = await req.json() as { source: string };
-          state.notebook.updateCellSource(req.params.id, body.source);
+          const body = await req.json() as { source?: string; cell_type?: "code" | "markdown" };
+          if (body.source !== undefined) {
+            state.notebook.updateCellSource(req.params.id, body.source);
+          }
+          if (body.cell_type) {
+            state.notebook.updateCellType(req.params.id, body.cell_type);
+          }
           ownWriteMarker.mark();
           await state.notebook.save(state.filePath);
           scheduleAutoSave();
@@ -204,6 +240,16 @@ export async function startServer(filePath: string, port: number = 3000, devMode
         POST: async (req) => {
           const body = await req.json() as { direction: "up" | "down" };
           state.notebook.moveCell(req.params.id, body.direction);
+          ownWriteMarker.mark();
+          await state.notebook.save(state.filePath);
+          scheduleAutoSave();
+          return Response.json({ ok: true });
+        },
+      },
+      "/api/cells/:id/reorder": {
+        POST: async (req) => {
+          const body = await req.json() as { toIndex: number };
+          state.notebook.reorderCell(req.params.id, body.toIndex);
           ownWriteMarker.mark();
           await state.notebook.save(state.filePath);
           scheduleAutoSave();
@@ -337,6 +383,7 @@ export async function startServer(filePath: string, port: number = 3000, devMode
           Object.assign(settings.appearance, body.appearance);
           Object.assign(settings.execution, body.execution);
           Object.assign(settings.ai, body.ai);
+          if (body.layout) Object.assign(settings.layout, body.layout);
           await saveSettings(settings);
           const pkg = await Bun.file(resolve(import.meta.dirname!, "../package.json")).json();
           return Response.json({
@@ -344,6 +391,15 @@ export async function startServer(filePath: string, port: number = 3000, devMode
             version: pkg.version,
             bunVersion: Bun.version,
           });
+        },
+      },
+      "/api/env": {
+        GET: async () => Response.json({ keys: envKeys }),
+      },
+      "/api/env/reload": {
+        POST: async () => {
+          await reloadEnv();
+          return Response.json({ keys: envKeys });
         },
       },
       "/api/types/bun": {
@@ -468,11 +524,15 @@ export async function startServer(filePath: string, port: number = 3000, devMode
               const result = await executeCode(cleanCode, state.context);
 
               state.notebook.updateCellSource(msg.cellId, msg.code);
+              // Detect rich output for saving
+              const richOutputForSave = result.value !== undefined ? detectOutputType(result.value) : undefined;
               state.notebook.setCellOutput(msg.cellId, state.executionCount, {
                 value: result.value !== undefined ? Bun.inspect(result.value) : undefined,
                 stdout: result.stdout,
                 stderr: result.stderr,
                 error: result.error,
+                richOutput: richOutputForSave as any,
+                tables: result.tables,
               });
 
               if (result.stdout) {
@@ -483,6 +543,14 @@ export async function startServer(filePath: string, port: number = 3000, devMode
               if (result.stderr) {
                 ws.send(JSON.stringify({
                   type: "stream", cellId: msg.cellId, name: "stderr", text: result.stderr,
+                }));
+              }
+              if (result.tables.length > 0) {
+                ws.send(JSON.stringify({
+                  type: "result", cellId: msg.cellId,
+                  value: "",
+                  executionCount: state.executionCount,
+                  richOutput: { type: "table", rows: result.tables },
                 }));
               }
               if (result.error) {
@@ -524,6 +592,8 @@ export async function startServer(filePath: string, port: number = 3000, devMode
               await state.notebook.save(state.filePath);
               scheduleAutoSave();
             }
+          } else if (msg.type === "interrupt") {
+            interruptExecution();
           }
         } catch (err) {
           // Catch-all: never let a bad message crash the server

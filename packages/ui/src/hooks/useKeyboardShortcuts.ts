@@ -17,10 +17,15 @@ interface ShortcutHandlers {
   onRunCell: () => void;
   onSave: () => void;
   onOpenPalette: () => void;
+  onTogglePresentation: () => void;
+  onInterrupt: () => void;
+  onUndo: () => void;
+  onRedo: () => void;
 }
 
 export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
   const lastDPress = useRef(0);
+  const lastIPress = useRef(0);
   const handlersRef = useRef(handlers);
   handlersRef.current = handlers;
 
@@ -37,6 +42,23 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "p" || e.key === "P")) {
         e.preventDefault();
         h.onOpenPalette();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "e" || e.key === "E")) {
+        e.preventDefault();
+        h.onTogglePresentation();
+        return;
+      }
+
+      // Undo/redo — only in command mode (edit mode: Monaco handles its own undo)
+      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey && h.mode === "command") {
+        e.preventDefault();
+        h.onUndo();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === "y" || (e.shiftKey && e.key === "z")) && h.mode === "command") {
+        e.preventDefault();
+        h.onRedo();
         return;
       }
 
@@ -56,6 +78,15 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
             e.preventDefault(); h.onDeleteCell(); lastDPress.current = 0;
           } else {
             lastDPress.current = now;
+          }
+          break;
+        }
+        case "i": {
+          const now = Date.now();
+          if (now - lastIPress.current < 500) {
+            e.preventDefault(); h.onInterrupt(); lastIPress.current = 0;
+          } else {
+            lastIPress.current = now;
           }
           break;
         }

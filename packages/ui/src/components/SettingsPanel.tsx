@@ -19,6 +19,7 @@ export function SettingsPanel({ open, settings, version, bunVersion, fileFormat,
         appearance: { ...settings.appearance, ...patch.appearance },
         execution: { ...settings.execution, ...patch.execution },
         ai: { ...settings.ai, ...patch.ai },
+        layout: { ...settings.layout, ...patch.layout },
       };
       onUpdate(next);
     },
@@ -85,10 +86,22 @@ export function SettingsPanel({ open, settings, version, bunVersion, fileFormat,
               <span>Theme</span>
               <select
                 value={settings.appearance.theme}
-                onChange={(e) => update({ appearance: { theme: e.target.value as "light" | "dark" } })}
+                onChange={(e) => update({ appearance: { ...settings.appearance, theme: e.target.value as "light" | "dark" } })}
               >
                 <option value="light">Light</option>
                 <option value="dark">Dark</option>
+              </select>
+            </label>
+
+            <label className="settings-row">
+              <span>Notifications</span>
+              <select
+                value={settings.appearance.notifications ?? "show"}
+                onChange={(e) => update({ appearance: { ...settings.appearance, notifications: e.target.value as "show" | "minimize" | "hide" } })}
+              >
+                <option value="show">Show (top-right)</option>
+                <option value="minimize">Minimize (status bar)</option>
+                <option value="hide">Hide</option>
               </select>
             </label>
           </section>
@@ -115,6 +128,33 @@ export function SettingsPanel({ open, settings, version, bunVersion, fileFormat,
                 onClick={() => update({ execution: { ...settings.execution, clearOutputBeforeRun: !settings.execution.clearOutputBeforeRun } })}
                 role="switch"
                 aria-checked={settings.execution.clearOutputBeforeRun}
+              >
+                <span className="toggle-knob" />
+              </button>
+            </label>
+          </section>
+
+          <section className="settings-section">
+            <h3><i className="bi bi-layout-sidebar" /> Layout</h3>
+
+            <label className="settings-row">
+              <span>Max width</span>
+              <select
+                value={settings.layout?.maxWidth ?? "fixed"}
+                onChange={(e) => update({ layout: { ...settings.layout, maxWidth: e.target.value as "fixed" | "auto" } })}
+              >
+                <option value="fixed">Fixed (1100px)</option>
+                <option value="auto">Full width</option>
+              </select>
+            </label>
+
+            <label className="settings-row">
+              <span>Sidebar</span>
+              <button
+                className={`toggle ${settings.layout?.sidebar ? "on" : ""}`}
+                onClick={() => update({ layout: { ...settings.layout, sidebar: !settings.layout?.sidebar } })}
+                role="switch"
+                aria-checked={settings.layout?.sidebar ?? false}
               >
                 <span className="toggle-knob" />
               </button>

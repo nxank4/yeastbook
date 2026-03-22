@@ -48,6 +48,7 @@ export interface Settings {
   };
   appearance: {
     theme: "light" | "dark";
+    notifications: "show" | "minimize" | "hide";
   };
   execution: {
     autoSaveOnRun: boolean;
@@ -57,13 +58,18 @@ export interface Settings {
     provider: "anthropic" | "openai" | "disabled";
     apiKey: string;
   };
+  layout: {
+    maxWidth: "fixed" | "auto";
+    sidebar: boolean;
+  };
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   editor: { fontSize: 13, tabSize: 2, wordWrap: false },
-  appearance: { theme: "light" },
+  appearance: { theme: "light", notifications: "show" },
   execution: { autoSaveOnRun: true, clearOutputBeforeRun: false },
   ai: { provider: "disabled", apiKey: "" },
+  layout: { maxWidth: "fixed", sidebar: false },
 };
 
 export type WsOutgoing =

@@ -5,8 +5,10 @@ import { SettingsPanel } from "./components/SettingsPanel.tsx";
 import { MenuBar, ShortcutsModal, AboutModal } from "./components/MenuBar.tsx";
 import { StatusBar } from "./components/StatusBar.tsx";
 import { CommandPalette } from "./components/CommandPalette.tsx";
+import { EnvExplorer } from "./components/EnvExplorer.tsx";
 import { useWebSocket } from "./useWebSocket.ts";
 import { useKeyboardShortcuts, type Mode } from "./hooks/useKeyboardShortcuts.ts";
+import { useHistory } from "./hooks/useHistory.ts";
 import type { Cell, CellOutput, WsIncoming, Settings } from "@yeastbook/core";
 import { DEFAULT_SETTINGS } from "@yeastbook/core";
 
@@ -37,19 +39,39 @@ export function App() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [installStates, setInstallStates] = useState<Map<string, { packages: string[]; logs: string[]; done: boolean; error?: string }>>(new Map());
   const [mode, setMode] = useState<Mode>("command");
+  const [isPresenting, setIsPresenting] = useState(
+    new URLSearchParams(window.location.search).get("mode") === "present"
+  );
   const runAllResolveRef = useRef<(() => void) | null>(null);
+  const runAllAbortedRef = useRef(false);
+
+  useEffect(() => {
+    document.title = `${saved ? "" : "● "}${fileName} — Yeastbook`;
+  }, [fileName, saved]);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
-    setTimeout(() => setToast(null), 3000);
+    setTimeout(() => setToast(null), 1500);
   }, []);
+
+  const cellsRef = useRef(cells);
+  cellsRef.current = cells;
+  const getCells = useCallback(() => cellsRef.current, []);
+  const applyCells = useCallback((newCells: Cell[]) => setCells(newCells), []);
+  const history = useHistory(getCells, applyCells, showToast);
 
   // Load settings from server on mount
   useEffect(() => {
     fetch("/api/settings")
       .then((r) => r.json())
       .then((data) => {
-        setSettings({ editor: data.editor, appearance: data.appearance, execution: data.execution });
+        setSettings({
+          editor: data.editor,
+          appearance: { notifications: "show", ...data.appearance },
+          execution: data.execution,
+          ai: data.ai || { provider: "disabled", apiKey: "" },
+          layout: { maxWidth: "fixed", sidebar: false, ...data.layout },
+        });
         setTheme(data.appearance.theme);
         if (data.version) setVersion(data.version);
         if (data.bunVersion) setBunVersion(data.bunVersion);
@@ -93,6 +115,11 @@ export function App() {
     root.style.setProperty("--editor-tab-size", String(settings.editor.tabSize));
     root.style.setProperty("--editor-word-wrap", settings.editor.wordWrap ? "pre-wrap" : "pre");
   }, [settings.editor]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty("--notebook-max-width", settings.layout?.maxWidth === "auto" ? "100%" : "1100px");
+  }, [settings.layout?.maxWidth]);
 
   // --- WebSocket ---
   const handleWsMessage = useCallback((msg: WsIncoming) => {
@@ -275,10 +302,13 @@ export function App() {
   );
 
   const handleDeleteCell = useCallback(async (cellId: string) => {
+    const idx = cellsRef.current.findIndex((c) => c.id === cellId);
+    const cell = cellsRef.current[idx];
+    if (cell) history.push({ type: "delete_cell", cell, index: idx });
     await fetch(`/api/cells/${cellId}`, { method: "DELETE" });
     setCells((prev) => prev.filter((c) => c.id !== cellId));
     setSaved(true);
-  }, []);
+  }, [history]);
 
   const handleClearOutput = useCallback((cellId: string) => {
     setCells((prev) =>
@@ -322,22 +352,45 @@ export function App() {
   }, []);
 
   const handleMoveCell = useCallback(async (cellId: string, direction: "up" | "down") => {
+    const idx = cellsRef.current.findIndex((c) => c.id === cellId);
+    const target = direction === "up" ? idx - 1 : idx + 1;
+    if (idx !== -1 && target >= 0 && target < cellsRef.current.length) {
+      history.push({ type: "move_cell", cellId, fromIndex: idx, toIndex: target });
+    }
     await fetch(`/api/cells/${cellId}/move`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ direction }),
     });
     setCells((prev) => {
-      const idx = prev.findIndex((c) => c.id === cellId);
-      if (idx === -1) return prev;
-      const target = direction === "up" ? idx - 1 : idx + 1;
-      if (target < 0 || target >= prev.length) return prev;
+      const i = prev.findIndex((c) => c.id === cellId);
+      if (i === -1) return prev;
+      const t = direction === "up" ? i - 1 : i + 1;
+      if (t < 0 || t >= prev.length) return prev;
       const next = [...prev];
-      [next[idx], next[target]] = [next[target], next[idx]];
+      [next[i], next[t]] = [next[t], next[i]];
       return next;
     });
     setSaved(true);
   }, []);
+
+  const handleReorderCell = useCallback(async (cellId: string, toIndex: number) => {
+    const fromIndex = cellsRef.current.findIndex((c) => c.id === cellId);
+    if (fromIndex === -1 || fromIndex === toIndex) return;
+    history.push({ type: "move_cell", cellId, fromIndex, toIndex });
+    setCells((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+    await fetch(`/api/cells/${cellId}/reorder`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ toIndex }),
+    });
+    setSaved(false);
+  }, [history]);
 
   const handleRename = useCallback(async (newName: string) => {
     const trimmed = newName.trim();
@@ -361,14 +414,11 @@ export function App() {
     setBusyCells(new Set());
   }, []);
 
-  const handleRunAll = useCallback(async () => {
+  const runCellSequence = useCallback(async (codeCells: Cell[]) => {
+    runAllAbortedRef.current = false;
     setRunningAll(true);
-    const currentCells = await new Promise<Cell[]>((resolve) => {
-      setCells((prev) => { resolve(prev); return prev; });
-    });
-    const codeCells = currentCells.filter((c) => c.cell_type === "code");
-
     for (const cell of codeCells) {
+      if (runAllAbortedRef.current) break;
       const code = cell.source.join("\n");
       if (!code.trim()) continue;
       await new Promise<void>((resolve) => {
@@ -379,11 +429,123 @@ export function App() {
     setRunningAll(false);
   }, [handleRunCell]);
 
+  const handleRunAll = useCallback(async () => {
+    const currentCells = await new Promise<Cell[]>((resolve) => {
+      setCells((prev) => { resolve(prev); return prev; });
+    });
+    await runCellSequence(currentCells.filter((c) => c.cell_type === "code"));
+  }, [runCellSequence]);
+
+  const handleRunAllAbove = useCallback(async (targetCellId?: string) => {
+    const cellId = targetCellId ?? focusedCellId;
+    if (!cellId) return;
+    const currentCells = await new Promise<Cell[]>((resolve) => {
+      setCells((prev) => { resolve(prev); return prev; });
+    });
+    const idx = currentCells.findIndex((c) => c.id === cellId);
+    if (idx === -1) return;
+    await runCellSequence(currentCells.slice(0, idx + 1).filter((c) => c.cell_type === "code"));
+  }, [runCellSequence, focusedCellId]);
+
+  const handleRunAllBelow = useCallback(async (targetCellId?: string) => {
+    const cellId = targetCellId ?? focusedCellId;
+    if (!cellId) return;
+    const currentCells = await new Promise<Cell[]>((resolve) => {
+      setCells((prev) => { resolve(prev); return prev; });
+    });
+    const idx = currentCells.findIndex((c) => c.id === cellId);
+    if (idx === -1) return;
+    await runCellSequence(currentCells.slice(idx).filter((c) => c.cell_type === "code"));
+  }, [runCellSequence, focusedCellId]);
+
+  const handleInterrupt = useCallback(() => {
+    runAllAbortedRef.current = true;
+    send({ type: "interrupt" });
+  }, [send]);
+
   const handleSave = useCallback(async () => {
     await fetch("/api/save", { method: "POST" });
     setSaved(true);
     showToast("Saved");
   }, [showToast]);
+
+  const handleInsertCellAt = useCallback(async (type: "code" | "markdown", position: "above" | "below", targetCellId: string) => {
+    const targetIdx = cellsRef.current.findIndex((c) => c.id === targetCellId);
+    if (position === "above") {
+      const res = await fetch("/api/cells/insert", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, source: "" }),
+      });
+      const { id } = await res.json();
+      const cell: Cell = { id, cell_type: type, source: [], outputs: [], execution_count: null, metadata: {} };
+      const insertIdx = targetIdx >= 0 ? targetIdx : 0;
+      history.push({ type: "add_cell", cell, index: insertIdx });
+      setCells((prev) => {
+        const idx = prev.findIndex((c) => c.id === targetCellId);
+        if (idx >= 0) {
+          const next = [...prev];
+          next.splice(idx, 0, cell);
+          return next;
+        }
+        return [cell, ...prev];
+      });
+    } else {
+      const res = await fetch("/api/cells/insert", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, source: "", afterId: targetCellId }),
+      });
+      const { id } = await res.json();
+      const cell: Cell = { id, cell_type: type, source: [], outputs: [], execution_count: null, metadata: {} };
+      const insertIdx = targetIdx !== -1 ? targetIdx + 1 : cellsRef.current.length;
+      history.push({ type: "add_cell", cell, index: insertIdx });
+      setCells((prev) => {
+        const idx = prev.findIndex((c) => c.id === targetCellId);
+        if (idx !== -1) {
+          const next = [...prev];
+          next.splice(idx + 1, 0, cell);
+          return next;
+        }
+        return [...prev, cell];
+      });
+    }
+    setSaved(false);
+  }, [history]);
+
+  const handleCutCellById = useCallback((cellId: string) => {
+    const cell = cells.find((c) => c.id === cellId);
+    if (cell) {
+      setClipboardCell({ ...cell });
+      handleDeleteCell(cellId);
+    }
+  }, [cells, handleDeleteCell]);
+
+  const handleCopyCellById = useCallback((cellId: string) => {
+    const cell = cells.find((c) => c.id === cellId);
+    if (cell) setClipboardCell({ ...cell });
+  }, [cells]);
+
+  const handlePasteCellBelow = useCallback(async (afterCellId: string) => {
+    if (!clipboardCell) return;
+    const res = await fetch("/api/cells/insert", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: clipboardCell.cell_type, source: clipboardCell.source.join(""), afterId: afterCellId }),
+    });
+    const { id } = await res.json();
+    const newCell: Cell = { ...clipboardCell, id, outputs: [], execution_count: null };
+    setCells((prev) => {
+      const idx = prev.findIndex((c) => c.id === afterCellId);
+      if (idx !== -1) {
+        const next = [...prev];
+        next.splice(idx + 1, 0, newCell);
+        return next;
+      }
+      return [...prev, newCell];
+    });
+    setSaved(false);
+  }, [clipboardCell]);
 
   // --- Keyboard shortcut handlers ---
   const handleAddCellAbove = useCallback(async () => {
@@ -445,10 +607,24 @@ export function App() {
     });
   }, [focusedCellId]);
 
-  const handleChangeCellType = useCallback(async (type: "code" | "markdown") => {
-    if (!focusedCellId) return;
-    setCells((prev) => prev.map((c) => c.id === focusedCellId ? { ...c, cell_type: type } : c));
-  }, [focusedCellId]);
+  const handleChangeCellType = useCallback(async (type: "code" | "markdown", cellId?: string) => {
+    const id = cellId ?? focusedCellId;
+    if (!id) return;
+    const cell = cellsRef.current.find((c) => c.id === id);
+    if (cell && cell.cell_type !== type) {
+      history.push({ type: "change_type", cellId: id, before: cell.cell_type, after: type });
+    }
+    setCells((prev) => prev.map((c) => {
+      if (c.id !== id) return c;
+      if (type === "markdown") return { ...c, cell_type: type, outputs: [], execution_count: null };
+      return { ...c, cell_type: type };
+    }));
+    await fetch(`/api/cells/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cell_type: type }),
+    });
+  }, [focusedCellId, history]);
 
   const handleEnterEdit = useCallback(() => {
     setMode("edit");
@@ -464,15 +640,36 @@ export function App() {
 
   // --- Track focused cell ---
   useEffect(() => {
-    const handler = (e: FocusEvent) => {
+    const handleFocusIn = (e: FocusEvent) => {
       const target = e.target as HTMLElement;
       const cell = target.closest?.("[id^='cell-']");
       if (cell) {
         setFocusedCellId(cell.id.replace("cell-", ""));
       }
     };
-    document.addEventListener("focusin", handler);
-    return () => document.removeEventListener("focusin", handler);
+    const handleMouseDown = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const cell = target.closest?.("[id^='cell-']");
+      const isOverlay = target.closest?.(".context-menu, .palette-overlay, .settings-overlay, .modal-overlay, .menu-dropdown, .open-file-overlay");
+      if (isOverlay) return; // don't change focus when clicking overlays
+      if (cell) {
+        // Clicking inside a cell — select it in command mode
+        // (unless clicking inside Monaco editor, which will trigger focusin → edit mode)
+        const cellId = cell.id.replace("cell-", "");
+        setFocusedCellId(cellId);
+        const isEditor = target.closest?.(".monaco-editor");
+        if (!isEditor) setMode("command");
+      } else {
+        setFocusedCellId(null);
+        setMode("command");
+      }
+    };
+    document.addEventListener("focusin", handleFocusIn);
+    document.addEventListener("mousedown", handleMouseDown);
+    return () => {
+      document.removeEventListener("focusin", handleFocusIn);
+      document.removeEventListener("mousedown", handleMouseDown);
+    };
   }, []);
 
   // --- Menu actions ---
@@ -567,6 +764,17 @@ export function App() {
     await handleRunAll();
   }, [handleRestart, handleRunAll]);
 
+  const togglePresentation = useCallback(() => {
+    setIsPresenting((prev) => {
+      const next = !prev;
+      const url = new URL(window.location.href);
+      if (next) url.searchParams.set("mode", "present");
+      else url.searchParams.delete("mode");
+      window.history.replaceState({}, "", url.toString());
+      return next;
+    });
+  }, []);
+
   const paletteCommands = useMemo(() => [
     { id: "restart", label: "Restart Kernel", action: handleRestart },
     { id: "run-all", label: "Run All Cells", action: handleRunAll },
@@ -582,7 +790,11 @@ export function App() {
     { id: "export-ybk", label: "Export as .ybk", action: handleExportYbk },
     { id: "settings", label: "Open Settings", action: () => setSettingsOpen(true) },
     { id: "shortcuts", label: "Show Keyboard Shortcuts", action: () => setShortcutsOpen(true) },
-  ], [handleRestart, handleRunAll, handleSave, handleAddCell, toggleTheme, handleExportIpynb, handleExportYbk]);
+    { id: "present", label: "Toggle Presentation Mode", shortcut: "Ctrl+Shift+E", action: togglePresentation },
+    { id: "run-above", label: "Run All Above", action: () => handleRunAllAbove() },
+    { id: "run-below", label: "Run All Below", action: () => handleRunAllBelow() },
+    { id: "interrupt", label: "Interrupt Execution", shortcut: "I I", action: handleInterrupt },
+  ], [handleRestart, handleRunAll, handleSave, handleAddCell, toggleTheme, handleExportIpynb, handleExportYbk, togglePresentation, handleRunAllAbove, handleRunAllBelow, handleInterrupt]);
 
   const FONT_SIZES = [12, 13, 14, 16];
 
@@ -630,41 +842,63 @@ export function App() {
     onRunCell: handleMenuRunCell,
     onSave: handleSave,
     onOpenPalette: () => setPaletteOpen(true),
+    onTogglePresentation: togglePresentation,
+    onInterrupt: handleInterrupt,
+    onUndo: history.undo,
+    onRedo: history.redo,
   });
 
   return (
     <>
-      <div className="toolbar">
-        <span className="toolbar-logo">🍞 yeastbook</span>
-        <EditableFileName fileName={fileName} onRename={handleRename} />
-      </div>
-      <MenuBar
-        focusedCellId={focusedCellId}
-        cells={cells}
-        clipboardCell={clipboardCell}
-        runningAll={runningAll}
-        onNewNotebook={handleNewNotebook}
-        onOpenFile={handleOpenFile}
-        onSave={handleSave}
-        onExportIpynb={handleExportIpynb}
-        onExportYbk={handleExportYbk}
-        onCutCell={handleCutCell}
-        onCopyCell={handleCopyCell}
-        onPasteCell={handlePasteCell}
-        onDeleteCell={() => focusedCellId && handleDeleteCell(focusedCellId)}
-        onMoveCellUp={() => focusedCellId && handleMoveCell(focusedCellId, "up")}
-        onMoveCellDown={() => focusedCellId && handleMoveCell(focusedCellId, "down")}
-        onRunCell={handleMenuRunCell}
-        onRunAll={handleRunAll}
-        onRestart={handleRestart}
-        onRestartAndRunAll={handleRestartAndRunAll}
-        onToggleDarkMode={toggleTheme}
-        onFontSizeIncrease={handleFontSizeIncrease}
-        onFontSizeDecrease={handleFontSizeDecrease}
-        onToggleWordWrap={handleToggleWordWrap}
-        onShowShortcuts={() => setShortcutsOpen(true)}
-        onShowAbout={() => setAboutOpen(true)}
-      />
+      {isPresenting ? (
+        <div className="presentation-header">
+          <span className="presentation-badge">&#9654; Presenting</span>
+          <span className="presentation-title">{fileName}</span>
+          <button onClick={togglePresentation} className="exit-present-btn">&#9998; Edit</button>
+        </div>
+      ) : (
+        <>
+          <div className="toolbar">
+            <span className="toolbar-logo">🍞 yeastbook</span>
+            <EditableFileName fileName={fileName} onRename={handleRename} />
+          </div>
+          <MenuBar
+            focusedCellId={focusedCellId}
+            cells={cells}
+            clipboardCell={clipboardCell}
+            runningAll={runningAll}
+            onNewNotebook={handleNewNotebook}
+            onOpenFile={handleOpenFile}
+            onSave={handleSave}
+            onExportIpynb={handleExportIpynb}
+            onExportYbk={handleExportYbk}
+            onCutCell={handleCutCell}
+            onCopyCell={handleCopyCell}
+            onPasteCell={handlePasteCell}
+            onDeleteCell={() => focusedCellId && handleDeleteCell(focusedCellId)}
+            onMoveCellUp={() => focusedCellId && handleMoveCell(focusedCellId, "up")}
+            onMoveCellDown={() => focusedCellId && handleMoveCell(focusedCellId, "down")}
+            onRunCell={handleMenuRunCell}
+            onRunAll={handleRunAll}
+            onRunAllAbove={() => handleRunAllAbove()}
+            onRunAllBelow={() => handleRunAllBelow()}
+            onInterrupt={handleInterrupt}
+            onRestart={handleRestart}
+            onRestartAndRunAll={handleRestartAndRunAll}
+            onToggleDarkMode={toggleTheme}
+            onTogglePresentation={togglePresentation}
+            onFontSizeIncrease={handleFontSizeIncrease}
+            onFontSizeDecrease={handleFontSizeDecrease}
+            onToggleWordWrap={handleToggleWordWrap}
+            onShowShortcuts={() => setShortcutsOpen(true)}
+            onShowAbout={() => setAboutOpen(true)}
+            onUndo={history.undo}
+            onRedo={history.redo}
+            canUndo={history.canUndo()}
+            canRedo={history.canRedo()}
+          />
+        </>
+      )}
       <SettingsPanel
         open={settingsOpen}
         settings={settings}
@@ -676,6 +910,7 @@ export function App() {
       />
       <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
       <AboutModal open={aboutOpen} onClose={() => setAboutOpen(false)} version={version} bunVersion={bunVersion} />
+      <div className="notebook-layout">
       <NotebookView
         cells={cells}
         busyCells={busyCells}
@@ -684,6 +919,7 @@ export function App() {
         installStates={installStates}
         mode={mode}
         focusedCellId={focusedCellId}
+        isPresenting={isPresenting}
         onModeChange={handleModeChange}
         onRunCell={handleRunCell}
         onRunAndAdvance={handleRunAndAdvance}
@@ -693,9 +929,29 @@ export function App() {
         onUpdateMarkdown={handleUpdateMarkdown}
         onAddCell={handleAddCell}
         onMoveCell={handleMoveCell}
+        onRunAllAbove={handleRunAllAbove}
+        onRunAllBelow={handleRunAllBelow}
+        onInterrupt={handleInterrupt}
+        onChangeCellType={handleChangeCellType}
+        onInsertCellAt={handleInsertCellAt}
+        onCutCell={handleCutCellById}
+        onCopyCell={handleCopyCellById}
+        onPasteCellBelow={handlePasteCellBelow}
+        hasClipboard={!!clipboardCell}
+        onRunAll={handleRunAll}
+        onHistoryPush={history.push}
+        onReorderCell={handleReorderCell}
+        onSave={handleSave}
+        onOpenPalette={() => setPaletteOpen(true)}
       />
-      {toast && <div className="toast">{toast}</div>}
-      <StatusBar mode={mode} connected={connected} saved={saved} />
+      {settings.layout?.sidebar && !isPresenting && (
+        <div className="notebook-sidebar">
+          <EnvExplorer />
+        </div>
+      )}
+      </div>
+      {toast && settings.appearance.notifications === "show" && <div className="toast">{toast}</div>}
+      {!isPresenting && <StatusBar mode={mode} connected={connected} saved={saved} notification={settings.appearance.notifications === "minimize" ? toast : null} />}
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} commands={paletteCommands} />
     </>
   );

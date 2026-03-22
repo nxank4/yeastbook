@@ -3,10 +3,21 @@
 import { $ } from "bun";
 import { transformCellCode, createSlider, createInput, createToggle, createSelect } from "@yeastbook/core";
 
+// Interrupt mechanism — allows cancelling execution between async yields
+let interruptReject: ((err: Error) => void) | null = null;
+
+export function interruptExecution(): void {
+  if (interruptReject) {
+    interruptReject(new Error("KeyboardInterrupt"));
+    interruptReject = null;
+  }
+}
+
 export interface ExecResult {
   value: unknown;
   stdout: string;
   stderr: string;
+  tables: Record<string, unknown>[];
   error?: { ename: string; evalue: string; traceback: string[] };
 }
 
@@ -16,12 +27,27 @@ export async function executeCode(
 ): Promise<ExecResult> {
   let stdout = "";
   let stderr = "";
+  const tables: Record<string, unknown>[] = [];
 
   // Snapshot globalThis keys before execution
   const keysBefore = new Set(Object.keys(globalThis));
 
   // Inject context into globalThis
   Object.assign(globalThis, context);
+
+  // Override process.exit/abort to prevent user code from killing the server
+  const origExit = process.exit;
+  const origAbort = process.abort;
+  let exitCalled = false;
+  let exitCode: number | undefined;
+  process.exit = ((code?: number) => {
+    exitCalled = true;
+    exitCode = code;
+    throw new Error(`Cell called process.exit(${code ?? 0}) — kernel restart required`);
+  }) as any;
+  process.abort = (() => {
+    throw new Error("Cell called process.abort() — kernel restart required");
+  }) as any;
 
   // Monkey-patch console
   const origLog = console.log;
@@ -40,13 +66,8 @@ export async function executeCode(
   const origTable = console.table;
   console.table = (data: unknown) => {
     if (Array.isArray(data) && data.length > 0 && typeof data[0] === "object" && data[0] !== null) {
-      const rows = data as Record<string, unknown>[];
-      const keys = Object.keys(rows[0]);
-      const widths = keys.map((k) => Math.max(k.length, ...rows.map((r) => String(r[k] ?? "").length)));
-      const header = keys.map((k, i) => k.padEnd(widths[i])).join(" | ");
-      const sep = widths.map((w) => "-".repeat(w)).join("-+-");
-      const body = rows.map((r) => keys.map((k, i) => String(r[k] ?? "").padEnd(widths[i])).join(" | ")).join("\n");
-      stdout += header + "\n" + sep + "\n" + body + "\n";
+      // Store raw data for rich table rendering
+      for (const row of data) tables.push(row as Record<string, unknown>);
     } else {
       stdout += (typeof data === "string" ? data : Bun.inspect(data)) + "\n";
     }
@@ -57,7 +78,14 @@ export async function executeCode(
     const wrapped = transformCellCode(code);
     // Expose Bun Shell ($) and Bun APIs as named parameters in cell context
     const fn = new AsyncFunction("$", "Bun", "createSlider", "createInput", "createToggle", "createSelect", wrapped);
-    const value = await fn($, Bun, createSlider, createInput, createToggle, createSelect);
+    const interruptPromise = new Promise<never>((_, reject) => {
+      interruptReject = reject;
+    });
+    const value = await Promise.race([
+      fn($, Bun, createSlider, createInput, createToggle, createSelect),
+      interruptPromise,
+    ]);
+    interruptReject = null;
 
     // Capture new globalThis keys into context
     for (const key of Object.keys(globalThis)) {
@@ -66,20 +94,26 @@ export async function executeCode(
       }
     }
 
-    return { value, stdout, stderr };
+    return { value, stdout, stderr, tables };
   } catch (err: unknown) {
     const error = err instanceof Error ? err : new Error(String(err));
+    const ename = exitCalled ? "ProcessExitError" : error.constructor.name;
     return {
       value: undefined,
       stdout,
       stderr,
+      tables,
       error: {
-        ename: error.constructor.name,
+        ename,
         evalue: error.message,
-        traceback: (error.stack ?? "").split("\n"),
+        traceback: exitCalled
+          ? ["Cell attempted to exit the process. Use Restart Kernel to reset."]
+          : (error.stack ?? "").split("\n"),
       },
     };
   } finally {
+    process.exit = origExit;
+    process.abort = origAbort;
     console.log = origLog;
     console.error = origError;
     console.warn = origWarn;
