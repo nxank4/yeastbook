@@ -93,6 +93,12 @@ export async function executeCode(
         context[key] = (globalThis as Record<string, unknown>)[key];
       }
     }
+    // Also sync existing context keys that may have been reassigned
+    for (const key of Object.keys(context)) {
+      if (key in globalThis) {
+        context[key] = (globalThis as Record<string, unknown>)[key];
+      }
+    }
 
     return { value, stdout, stderr, tables };
   } catch (err: unknown) {
