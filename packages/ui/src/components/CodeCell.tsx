@@ -400,6 +400,8 @@ export function CodeCell({
             domReadOnly: isPresenting,
             dragAndDrop: false,
             contextmenu: false,
+            hover: { enabled: false },
+            occurrencesHighlight: "off",
           }}
         />
       </div>
