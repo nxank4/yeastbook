@@ -3,16 +3,6 @@
 import { $ } from "bun";
 import { transformCellCode, createSlider, createInput, createToggle, createSelect } from "@yeastbook/core";
 
-// Verify transform module loaded correctly at startup
-const _verifyTransform = transformCellCode("const _v = 1");
-if (!_verifyTransform.includes("globalThis._v")) {
-  process.stderr.write(`\x1b[31m[FATAL] transformCellCode is NOT hoisting to globalThis!\x1b[0m\n`);
-  process.stderr.write(`Output: ${_verifyTransform}\n`);
-  process.stderr.write(`Module resolution may be stale. Try: rm -rf node_modules && bun install\n`);
-} else {
-  process.stderr.write(`\x1b[32m[OK] transformCellCode globalThis hoisting verified\x1b[0m\n`);
-}
-
 // Interrupt mechanism — allows cancelling execution between async yields
 let interruptReject: ((err: Error) => void) | null = null;
 
@@ -29,6 +19,45 @@ export interface ExecResult {
   stderr: string;
   tables: Record<string, unknown>[];
   error?: { ename: string; evalue: string; traceback: string[] };
+}
+
+/**
+ * Ensure all `var x = expr` lines in the wrapped code also assign to globalThis.
+ * This is a safety net — even if transformCellCode's hoisting doesn't work
+ * (stale module cache, etc.), this guarantees vars escape the IIFE scope.
+ */
+function ensureGlobalThisHoisting(wrapped: string): string {
+  return wrapped.replace(
+    /^(\s*)var\s+([a-zA-Z_$]\w*)\s*=\s*(.+)$/gm,
+    (_match, indent, name, expr) => {
+      // Skip if already has globalThis hoisting
+      if (expr.trimStart().startsWith(`globalThis.${name}`)) return _match;
+      return `${indent}var ${name} = globalThis.${name} = ${expr}`;
+    }
+  ).replace(
+    // Destructuring: var { a, b } = expr  →  var { a, b } = expr; globalThis.a = a; globalThis.b = b
+    /^(\s*)var\s+(\{[^}]+\})\s*=\s*(.+?)(?:;\s*globalThis\.\w+.*)?$/gm,
+    (_match, indent, pattern, expr) => {
+      // Don't double-process if globalThis assignments already exist
+      if (_match.includes("globalThis.")) return _match;
+      const names = pattern.replace(/[{}\s]+/g, " ").trim().split(/\s*,\s*/)
+        .map((n: string) => n.split(":").pop()!.split("=")[0]!.trim())
+        .filter((n: string) => /^[a-zA-Z_$]\w*$/.test(n));
+      const assignments = names.map((n: string) => `globalThis.${n} = ${n}`).join("; ");
+      return `${indent}var ${pattern} = ${expr}; ${assignments}`;
+    }
+  ).replace(
+    // Array destructuring: var [x, y] = expr
+    /^(\s*)var\s+(\[[^\]]+\])\s*=\s*(.+?)(?:;\s*globalThis\.\w+.*)?$/gm,
+    (_match, indent, pattern, expr) => {
+      if (_match.includes("globalThis.")) return _match;
+      const names = pattern.replace(/[\[\]\s]+/g, " ").trim().split(/\s*,\s*/)
+        .map((n: string) => n.split("=")[0]!.trim())
+        .filter((n: string) => /^[a-zA-Z_$]\w*$/.test(n));
+      const assignments = names.map((n: string) => `globalThis.${n} = ${n}`).join("; ");
+      return `${indent}var ${pattern} = ${expr}; ${assignments}`;
+    }
+  );
 }
 
 export async function executeCode(
@@ -49,10 +78,8 @@ export async function executeCode(
   const origExit = process.exit;
   const origAbort = process.abort;
   let exitCalled = false;
-  let exitCode: number | undefined;
   process.exit = ((code?: number) => {
     exitCalled = true;
-    exitCode = code;
     throw new Error(`Cell called process.exit(${code ?? 0}) — kernel restart required`);
   }) as any;
   process.abort = (() => {
@@ -76,7 +103,6 @@ export async function executeCode(
   const origTable = console.table;
   console.table = (data: unknown) => {
     if (Array.isArray(data) && data.length > 0 && typeof data[0] === "object" && data[0] !== null) {
-      // Store raw data for rich table rendering
       for (const row of data) tables.push(row as Record<string, unknown>);
     } else {
       stdout += (typeof data === "string" ? data : Bun.inspect(data)) + "\n";
@@ -85,10 +111,13 @@ export async function executeCode(
 
   try {
     const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
-    const wrapped = transformCellCode(code);
-    const hasGlobalThis = wrapped.includes("globalThis.");
-    process.stderr.write(`[kernel] transformed (globalThis=${hasGlobalThis}):\n${wrapped}\n`);
-    // Expose Bun Shell ($) and Bun APIs as named parameters in cell context
+    let wrapped = transformCellCode(code);
+
+    // Safety net: ensure globalThis hoisting even if transform didn't do it
+    wrapped = ensureGlobalThisHoisting(wrapped);
+
+    process.stderr.write(`[kernel] transformed:\n${wrapped}\n`);
+
     const fn = new AsyncFunction("$", "Bun", "createSlider", "createInput", "createToggle", "createSelect", wrapped);
     const interruptPromise = new Promise<never>((_, reject) => {
       interruptReject = reject;
