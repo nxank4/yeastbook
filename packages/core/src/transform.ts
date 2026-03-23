@@ -152,12 +152,11 @@ export function transformCellCode(code: string): string {
 
     transformed.push(line);
 
-    // Track brace depth — skip comment lines to avoid counting braces in comments
-    if (!trimmed.startsWith("//") && !trimmed.startsWith("/*")) {
-      for (const ch of trimmed) {
-        if (ch === "{") braceDepth++;
-        else if (ch === "}") braceDepth = Math.max(0, braceDepth - 1);
-      }
+    // Track brace depth — strip comments before counting to avoid braces in comments
+    const codeOnly = trimmed.replace(/\/\/.*$/, "").replace(/\/\*.*?\*\//g, "");
+    for (const ch of codeOnly) {
+      if (ch === "{") braceDepth++;
+      else if (ch === "}") braceDepth = Math.max(0, braceDepth - 1);
     }
   }
 
