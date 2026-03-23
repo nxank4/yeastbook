@@ -42,10 +42,11 @@ export function CellOutput({ outputs }: Props) {
         if (out.output_type === "error") {
           return (
             <div key={i} className="output-error">
-              <div className="error-header">{out.ename}: {out.evalue}</div>
               {out.traceback?.length ? (
                 <pre className="traceback">{out.traceback.join("\n")}</pre>
-              ) : null}
+              ) : (
+                <pre className="traceback">{out.ename}: {out.evalue}</pre>
+              )}
             </div>
           );
         }

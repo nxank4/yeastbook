@@ -4,6 +4,8 @@ import { CellOutput } from "./CellOutput.tsx";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu.tsx";
 import type { Cell, CellOutput as CellOutputType } from "@yeastbook/core";
 
+let bunTypesLoaded = false;
+
 interface Props {
   cell: Cell;
   busy: boolean;
@@ -68,6 +70,8 @@ export function CodeCell({
   onSaveRef.current = onSave;
   const onOpenPaletteRef = useRef(onOpenPalette);
   onOpenPaletteRef.current = onOpenPalette;
+  const isPresentingRef = useRef(isPresenting);
+  isPresentingRef.current = isPresenting;
 
   const updateHeight = useCallback(() => {
     const editor = editorRef.current;
@@ -84,7 +88,7 @@ export function CodeCell({
       noSemanticValidation: false,
       noSyntaxValidation: false,
       noSuggestionDiagnostics: true,
-      diagnosticCodesToIgnore: [2307, 2304, 1378, 2580, 7044, 2686],
+      diagnosticCodesToIgnore: [2307, 2304, 1375, 1378, 2580, 7044, 2686, 2300, 2302, 2451],
     };
     monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions(diagOpts);
     monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions(diagOpts);
@@ -96,6 +100,7 @@ export function CodeCell({
       allowSyntheticDefaultImports: true,
       esModuleInterop: true,
       allowNonTsExtensions: true,
+      isolatedModules: true,
       noEmit: true,
     };
     monaco.languages.typescript.typescriptDefaults.setCompilerOptions(compilerOpts);
@@ -236,54 +241,18 @@ export function CodeCell({
       monaco.languages.typescript.javascriptDefaults.addExtraLib(dts, uri);
     };
 
-    fetch("/api/types/bun")
-      .then((r) => {
-        if (!r.ok) throw new Error("not found");
-        return r.text();
-      })
-      .then((dts) => {
-        if (dts && dts.length > 100) {
-          addBunTypes(dts, "file:///node_modules/@types/bun/index.d.ts");
-        } else {
-          throw new Error("stub");
-        }
-      })
-      .catch(() => {
-        // Fallback: inline minimal Bun type declarations
-        const bunTypes = `
-declare namespace Bun {
-  const version: string;
-  const revision: string;
-  function file(path: string): BunFile;
-  function write(path: string | BunFile, data: string | ArrayBuffer | Blob): Promise<number>;
-  function serve(options: any): any;
-  function spawn(cmd: string[], options?: any): any;
-  function inspect(value: unknown): string;
-  const env: Record<string, string | undefined>;
-  function sleep(ms: number): Promise<void>;
-  function sleepSync(ms: number): void;
-  function hash(data: string | ArrayBuffer): number;
-  function build(options: any): Promise<any>;
-  const password: {
-    hash(password: string): Promise<string>;
-    verify(password: string, hash: string): Promise<boolean>;
-  };
-}
-interface BunFile {
-  text(): Promise<string>;
-  json(): Promise<any>;
-  arrayBuffer(): Promise<ArrayBuffer>;
-  size: number;
-  type: string;
-  exists(): Promise<boolean>;
-}
-declare function createSlider(config: { min: number; max: number; value?: number; step?: number; label?: string }): any;
-declare function createInput(config: { value?: string; placeholder?: string; label?: string }): any;
-declare function createToggle(config: { value?: boolean; label?: string }): any;
-declare function createSelect(config: { options: string[]; value?: string; label?: string }): any;
-`;
-        addBunTypes(bunTypes, "file:///node_modules/bun-globals/index.d.ts");
-      });
+    if (!bunTypesLoaded) {
+      bunTypesLoaded = true;
+      fetch("/api/types/bun")
+        .then((r) => { if (!r.ok) throw new Error("not found"); return r.text(); })
+        .then((dts) => {
+          if (dts && dts.length > 100) {
+            monaco.languages.typescript.typescriptDefaults.addExtraLib(dts, "file:///node_modules/@types/bun/index.d.ts");
+            monaco.languages.typescript.javascriptDefaults.addExtraLib(dts, "file:///node_modules/@types/bun/index.d.ts");
+          }
+        })
+        .catch(() => {});
+    }
 
     // Register shortcuts via capturing DOM listener — fires BEFORE Monaco processes events.
     // This avoids conflicts with Monaco's built-in Shift+Enter, Ctrl+Enter, Escape etc.
@@ -334,6 +303,7 @@ declare function createSelect(config: { options: string[]; value?: string; label
 
       // Intercept right-click inside Monaco → show yeastbook context menu
       domNode.addEventListener("contextmenu", (e: MouseEvent) => {
+        if (isPresentingRef.current) return;
         e.preventDefault();
         e.stopPropagation();
         setCtxMenu({ x: e.clientX, y: e.clientY, zone: "cell" });
@@ -440,13 +410,13 @@ declare function createSelect(config: { options: string[]; value?: string; label
   const displayOutputs = liveOutputs.length > 0 ? liveOutputs : cell.outputs;
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    if (isPresenting) return;
     e.preventDefault();
     e.stopPropagation();
-    // Auto-detect zone from click target
     const target = e.target as HTMLElement;
     const zone: "cell" | "output" = target.closest(".output-section") ? "output" : "cell";
     setCtxMenu({ x: e.clientX, y: e.clientY, zone });
-  }, []);
+  }, [isPresenting]);
 
   const showNativeMenu = useCallback(() => {
     if (!ctxMenu) return;

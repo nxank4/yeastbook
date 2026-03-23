@@ -86,6 +86,25 @@ function transformSingleImport(stmt: string): string {
 }
 
 /**
+ * Find the start index of a // line comment, ignoring // inside string literals.
+ * Returns -1 if no line comment is found.
+ */
+function findLineCommentStart(line: string): number {
+  let inString: string | null = null;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i]!;
+    if (inString) {
+      if (ch === "\\" ) { i++; continue; }
+      if (ch === inString) inString = null;
+    } else {
+      if (ch === '"' || ch === "'" || ch === "`") { inString = ch; continue; }
+      if (ch === "/" && line[i + 1] === "/") return i;
+    }
+  }
+  return -1;
+}
+
+/**
  * Transform cell code for notebook execution:
  * 1. Transform static ESM imports to dynamic await import()
  * 2. Convert top-level const/let to var (for cross-cell variable persistence)
@@ -170,7 +189,14 @@ export function transformCellCode(code: string): string {
     const trimmedLast = lastLine.trimStart();
     if (!isStatement(trimmedLast)) {
       const leadingSpace = lastLine.substring(0, lastLine.length - trimmedLast.length);
-      transformed[lastIdx] = leadingSpace + "return (" + trimmedLast.replace(/;$/, "") + ")";
+      const commentIdx = findLineCommentStart(trimmedLast);
+      if (commentIdx >= 0) {
+        const codePart = trimmedLast.slice(0, commentIdx).trimEnd().replace(/;$/, "");
+        const comment = trimmedLast.slice(commentIdx);
+        transformed[lastIdx] = leadingSpace + "return (" + codePart + ")  " + comment;
+      } else {
+        transformed[lastIdx] = leadingSpace + "return (" + trimmedLast.replace(/;$/, "") + ")";
+      }
     }
   }
 

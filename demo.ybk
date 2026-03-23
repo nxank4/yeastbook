@@ -11,471 +11,123 @@
       "name": "typescript"
     },
     "dependencies": {
-      "lodash": "^4.17.23",
-      "dayjs": "^1.11.20"
+      "@xenova/transformers": "^2.17.2"
     }
   },
   "cells": [
     {
-      "id": "demo-header",
-      "type": "markdown",
-      "source": "# Yeastbook Demo\nA tour of features — run each cell with Shift+Enter"
-    },
-    {
-      "id": "demo-01-basic",
-      "type": "code",
-      "source": "const greeting = \"Hello from Yeastbook \\ud83c\\udf5e\"\nconst version = Bun.version\nconsole.log(greeting)\nconsole.log(\"Bun version:\", version)",
-      "outputs": [
-        {
-          "output_type": "stream",
-          "name": "stdout",
-          "text": [
-            "Hello from Yeastbook 🍞\nBun version: 1.3.11\n"
-          ]
-        }
-      ],
-      "executionCount": 11
-    },
-    {
-      "id": "demo-02-context",
-      "type": "code",
-      "source": "// Variable greeting from cell 1 persists\ngreeting + \" \\u2014 context works!\"",
-      "outputs": [
-        {
-          "output_type": "execute_result",
-          "data": {
-            "text/plain": "\"Hello from Yeastbook 🍞 — context works!\""
-          },
-          "metadata": {},
-          "execution_count": 12,
-          "richOutput": {
-            "type": "text",
-            "text": "Hello from Yeastbook 🍞 — context works!"
-          }
-        }
-      ],
-      "executionCount": 12
-    },
-    {
-      "id": "demo-03-await",
-      "type": "code",
-      "source": "const res = await fetch(\"https://jsonplaceholder.typicode.com/todos/1\")\nconst todo = await res.json()\ntodo",
-      "outputs": [
-        {
-          "output_type": "execute_result",
-          "data": {
-            "text/plain": "{\n  userId: 1,\n  id: 1,\n  title: \"delectus aut autem\",\n  completed: false,\n}"
-          },
-          "metadata": {},
-          "execution_count": 13,
-          "richOutput": {
-            "type": "json",
-            "data": {
-              "userId": 1,
-              "id": 1,
-              "title": "delectus aut autem",
-              "completed": false
-            }
-          }
-        }
-      ],
-      "executionCount": 13
-    },
-    {
-      "id": "demo-04-table",
-      "type": "code",
-      "source": "const users = [\n  { name: \"Alice\", age: 30, role: \"admin\" },\n  { name: \"Bob\", age: 25, role: \"user\" },\n  { name: \"Charlie\", age: 35, role: \"user\" },\n]\nusers",
-      "outputs": [
-        {
-          "output_type": "execute_result",
-          "data": {
-            "text/plain": "[\n  {\n    name: \"Alice\",\n    age: 30,\n    role: \"admin\",\n  }, {\n    name: \"Bob\",\n    age: 25,\n    role: \"user\",\n  }, {\n    name: \"Charlie\",\n    age: 35,\n    role: \"user\",\n  }\n]"
-          },
-          "metadata": {},
-          "execution_count": 14,
-          "richOutput": {
-            "type": "table",
-            "rows": [
-              {
-                "name": "Alice",
-                "age": 30,
-                "role": "admin"
-              },
-              {
-                "name": "Bob",
-                "age": 25,
-                "role": "user"
-              },
-              {
-                "name": "Charlie",
-                "age": 35,
-                "role": "user"
-              }
-            ]
-          }
-        }
-      ],
-      "executionCount": 14
-    },
-    {
-      "id": "demo-05-chart",
-      "type": "code",
-      "source": "({\n  __type: \"chart\",\n  data: [12, 19, 8, 15, 22, 18, 25],\n  config: {\n    chartType: \"line\",\n    label: \"Weekly activity\",\n    title: \"User Activity Q1\"\n  }\n})",
-      "outputs": [],
-      "executionCount": 15
-    },
-    {
-      "id": "demo-06-console-table",
-      "type": "code",
-      "source": "console.table([\n  { method: \"GET\", endpoint: \"/api/users\", ms: 12 },\n  { method: \"POST\", endpoint: \"/api/login\", ms: 45 },\n  { method: \"DELETE\", endpoint: \"/api/session\", ms: 8 },\n])",
-      "outputs": [
-        {
-          "output_type": "execute_result",
-          "data": {
-            "text/plain": ""
-          },
-          "metadata": {},
-          "execution_count": 16,
-          "richOutput": {
-            "type": "table",
-            "rows": [
-              {
-                "method": "GET",
-                "endpoint": "/api/users",
-                "ms": 12
-              },
-              {
-                "method": "POST",
-                "endpoint": "/api/login",
-                "ms": 45
-              },
-              {
-                "method": "DELETE",
-                "endpoint": "/api/session",
-                "ms": 8
-              }
-            ]
-          }
-        }
-      ],
-      "executionCount": 16
-    },
-    {
-      "id": "demo-07-shell",
-      "type": "code",
-      "source": "const files = await $`ls -la`.text()\nconsole.log(files)",
-      "outputs": [
-        {
-          "output_type": "stream",
-          "name": "stdout",
-          "text": [
-            "drwxr-xr-x   9  1000  1000    +4096 Mar 23 03:24 .\ndrwxr-xr-x  16  1000  1000    +4096 Mar 20 09:47 ..\n-rw-r--r--   1  1000  1000      +30 Mar 20 09:48 index.ts\n-rw-r--r--   1  1000  1000     +261 Mar 23 02:16 install\ndrwxr-xr-x   3  1000  1000    +4096 Mar 20 10:12 docs\ndrwxr-xr-x   2  1000  1000    +4096 Mar 23 03:18 .claude\ndrwxr-xr-x   2  1000  1000    +4096 Mar 23 02:16 scripts\ndrwxr-xr-x   2  1000  1000    +4096 Mar 23 02:16 tests\n-rw-r--r--   1  1000  1000    +7855 Mar 23 02:16 demo.ipynb\n-rw-r--r--   1  1000  1000     +151 Mar 23 02:16 .npmignore\n-rw-r--r--   1  1000  1000      +40 Mar 23 03:24 .yeastbook-dev-notebook\n-rw-r--r--   1  1000  1000    +1876 Mar 23 02:16 README.md\ndrwxr-xr-x   6  1000  1000    +4096 Mar 23 02:17 node_modules\n-rw-r--r--   1  1000  1000    +7977 Mar 23 02:40 bun.lock\n-rw-r--r--   1  1000  1000     +511 Mar 23 02:16 .gitignore\ndrwxr-xr-x   6  1000  1000    +4096 Mar 23 02:16 packages\n-rw-r--r--   1  1000  1000    +1136 Mar 23 03:23 package.json\n-rw-r--r--   1  1000  1000     +713 Mar 20 09:48 tsconfig.json\n-rw-r--r--   1  1000  1000    +3101 Mar 23 02:16 CLAUDE.md\n-rw-r--r--   1  1000  1000   +10409 Mar 23 03:27 demo.ybk\ndrwxr-xr-x   8  1000  1000    +4096 Mar 23 03:24 .git\n\n"
-          ]
-        }
-      ],
-      "executionCount": 17
-    },
-    {
-      "id": "demo-08-isolation",
-      "type": "code",
-      "source": "// Server must survive this\nprocess.exit(1)",
-      "outputs": [
-        {
-          "output_type": "error",
-          "ename": "ProcessExitError",
-          "evalue": "Cell called process.exit(1) — kernel restart required",
-          "traceback": [
-            "Cell attempted to exit the process. Use Restart Kernel to reset."
-          ]
-        }
-      ],
-      "executionCount": 18
-    },
-    {
-      "id": "demo-09-widget",
-      "type": "code",
-      "source": "const slider = createSlider({ min: 0, max: 100, value: 50, label: \"Threshold\" })\nslider",
-      "outputs": [
-        {
-          "output_type": "execute_result",
-          "data": {
-            "text/plain": "{\n  value: 50,\n  __widgetId: \"widget_1_1774236464826\",\n  __type: \"widget\",\n  __widgetType: \"slider\",\n  __config: {\n    min: 0,\n    max: 100,\n    step: 1,\n    label: \"Threshold\",\n  },\n  _callbacks: [],\n  onChange: [Function: onChange],\n  destroy: [Function: destroy],\n}"
-          },
-          "metadata": {},
-          "execution_count": 19,
-          "richOutput": {
-            "type": "widget",
-            "widgetId": "widget_1_1774236464826",
-            "widgetType": "slider",
-            "value": 50,
-            "config": {
-              "min": 0,
-              "max": 100,
-              "step": 1,
-              "label": "Threshold"
-            }
-          }
-        }
-      ],
-      "executionCount": 19
-    },
-    {
-      "id": "demo-10-install",
-      "type": "code",
-      "source": "%install lodash",
-      "outputs": [
-        {
-          "output_type": "stream",
-          "name": "stdout",
-          "text": [
-            "✓ Installed lodash (lodash@4.17.23)\n"
-          ]
-        },
-        {
-          "output_type": "stream",
-          "name": "stdout",
-          "text": [
-            "✓ Installed lodash (lodash@4.17.23)\n"
-          ]
-        },
-        {
-          "output_type": "stream",
-          "name": "stdout",
-          "text": [
-            "✓ Installed lodash (lodash@4.17.23)\n"
-          ]
-        },
-        {
-          "output_type": "stream",
-          "name": "stdout",
-          "text": [
-            "✓ Installed lodash (lodash@4.17.23)\n"
-          ]
-        },
-        {
-          "output_type": "stream",
-          "name": "stdout",
-          "text": [
-            "✓ Installed lodash (lodash@4.17.23)\n"
-          ]
-        },
-        {
-          "output_type": "stream",
-          "name": "stdout",
-          "text": [
-            "✓ Installed lodash (lodash@4.17.23)\n"
-          ]
-        },
-        {
-          "output_type": "stream",
-          "name": "stdout",
-          "text": [
-            "✓ Installed lodash (lodash@4.17.23)\n"
-          ]
-        }
-      ],
-      "executionCount": null
-    },
-    {
-      "id": "demo-10b-lodash",
-      "type": "code",
-      "source": "import _ from \"lodash\"\n_.chunk([1,2,3,4,5,6], 2)",
-      "outputs": [
-        {
-          "output_type": "execute_result",
-          "data": {
-            "text/plain": "[\n  [ 1, 2 ], [ 3, 4 ], [ 5, 6 ]\n]"
-          },
-          "metadata": {},
-          "execution_count": 10,
-          "richOutput": {
-            "type": "json",
-            "data": [
-              [
-                1,
-                2
-              ],
-              [
-                3,
-                4
-              ],
-              [
-                5,
-                6
-              ]
-            ]
-          }
-        }
-      ],
-      "executionCount": 10
-    },
-    {
-      "id": "demo-11-perf",
-      "type": "code",
-      "source": "const start = performance.now()\nlet sum = 0\nfor (let i = 0; i < 10_000_000; i++) sum += i\nconst end = performance.now()\nconsole.log(`10M iterations: ${(end - start).toFixed(2)}ms`)\nconsole.log(`Sum: ${sum}`)",
-      "outputs": [
-        {
-          "output_type": "stream",
-          "name": "stdout",
-          "text": [
-            "10M iterations: 7.96ms\nSum: 49999995000000\n"
-          ]
-        }
-      ],
-      "executionCount": 21
-    },
-    {
-      "id": "demo-12-error",
-      "type": "code",
-      "source": "undefinedVariable.foo",
-      "outputs": [
-        {
-          "output_type": "error",
-          "ename": "ReferenceError",
-          "evalue": "undefinedVariable is not defined",
-          "traceback": [
-            "ReferenceError: undefinedVariable is not defined",
-            "    at <anonymous> (file:///home/nxank4/personal/yeastbook/packages/app/src/kernel/execute.ts:4:26)",
-            "    at anonymous (file:///home/nxank4/personal/yeastbook/packages/app/src/kernel/execute.ts:5:3)",
-            "    at executeCode (/home/nxank4/personal/yeastbook/packages/app/src/kernel/execute.ts:85:7)",
-            "    at message (/home/nxank4/personal/yeastbook/packages/app/src/server.ts:730:36)"
-          ]
-        }
-      ],
-      "executionCount": 9
-    },
-    {
-      "id": "demo-13-svg",
-      "type": "code",
-      "source": "({\n  __mime: \"image/svg+xml\",\n  data: `<svg width=\"200\" height=\"100\" xmlns=\"http://www.w3.org/2000/svg\">\n    <rect width=\"200\" height=\"100\" fill=\"#F7F4EF\"/>\n    <circle cx=\"50\" cy=\"50\" r=\"30\" fill=\"#D97706\"/>\n    <text x=\"100\" y=\"55\" font-family=\"Inter\" font-size=\"16\" fill=\"#1A1714\">Yeastbook</text>\n  </svg>`\n})",
-      "outputs": [],
-      "executionCount": 25
-    },
-    {
-      "id": "990f0d00-1aeb-4bdd-bb7b-ef068ace53a2",
-      "type": "code",
-      "source": "// Cell 1: Install lodash\r\n%install lodash",
-      "outputs": [],
-      "executionCount": 1
-    },
-    {
-      "id": "f2ca3bfe-6d79-4b3c-9433-d91a4b49111a",
-      "type": "code",
-      "source": "// Cell 2: Verify lodash works + check version\r\nimport _ from \"lodash\"\r\nconst version = (await Bun.file(\"node_modules/lodash/package.json\").json()).version\r\nconsole.log(\"lodash version:\", version)\r\n_.chunk([1,2,3,4,5,6], 2)",
-      "outputs": [
-        {
-          "output_type": "stream",
-          "name": "stdout",
-          "text": [
-            "lodash version: 4.17.23\n"
-          ]
-        },
-        {
-          "output_type": "execute_result",
-          "data": {
-            "text/plain": "[\n  [ 1, 2 ], [ 3, 4 ], [ 5, 6 ]\n]"
-          },
-          "metadata": {},
-          "execution_count": 2,
-          "richOutput": {
-            "type": "json",
-            "data": [
-              [
-                1,
-                2
-              ],
-              [
-                3,
-                4
-              ],
-              [
-                5,
-                6
-              ]
-            ]
-          }
-        }
-      ],
-      "executionCount": 2
-    },
-    {
-      "id": "1ba1edcb-1aef-4c07-bdac-89fa7ac4f492",
-      "type": "code",
-      "source": "// Cell 3: Check metadata đã lưu chưa\r\nconst notebook = await Bun.file(\"demo.ybk\").json()\r\nconsole.log(\"Dependencies in .ybk:\")\r\nconsole.log(notebook.metadata.dependencies)\r\n// Expected: { \"lodash\": \"^4.17.21\" }",
-      "outputs": [
-        {
-          "output_type": "stream",
-          "name": "stdout",
-          "text": [
-            "Dependencies in .ybk:\n{\n  lodash: \"^4.17.23\",\n  dayjs: \"^1.11.20\",\n}\n"
-          ]
-        }
-      ],
-      "executionCount": 3
-    },
-    {
-      "id": "29d7966b-135f-48ee-bf24-33848270fbdb",
-      "type": "code",
-      "source": "// Cell 4: Install thêm package\r\n%install dayjs",
-      "outputs": [],
-      "executionCount": 4
-    },
-    {
-      "id": "e04cddf3-92b5-483b-942b-3296294f6144",
-      "type": "code",
-      "source": "// Cell 5: Verify cả hai trong metadata\r\nimport dayjs from \"dayjs\"\r\nconsole.log(\"Today:\", dayjs().format(\"YYYY-MM-DD\"))\r\n\r\nconst nb = await Bun.file(\"demo.ybk\").json()\r\nconsole.log(\"All dependencies:\", nb.metadata.dependencies)\r\n// Expected: { \"lodash\": \"^x.x.x\", \"dayjs\": \"^x.x.x\" }",
-      "outputs": [
-        {
-          "output_type": "stream",
-          "name": "stdout",
-          "text": [
-            "Today: 2026-03-23\nAll dependencies: {\n  lodash: \"^4.17.23\",\n  dayjs: \"^1.11.20\",\n}\n"
-          ]
-        }
-      ],
-      "executionCount": 5
-    },
-    {
-      "id": "4e71fdfa-3f12-41b7-afa5-539f1952d272",
+      "id": "cell-01-setup",
       "type": "code",
       "source": "",
-      "outputs": [],
-      "executionCount": null
-    },
-    {
-      "id": "a82aca97-ef88-44fe-a78b-da08a3916c8f",
-      "type": "code",
-      "source": "import dayjs from \"dayjs\"\r\ndayjs().format(\"DD/MM/YYYY\")",
-      "outputs": [
-        {
-          "output_type": "execute_result",
-          "data": {
-            "text/plain": "\"23/03/2026\""
-          },
-          "metadata": {},
-          "execution_count": 12,
-          "richOutput": {
-            "type": "text",
-            "text": "23/03/2026"
-          }
-        }
-      ],
-      "executionCount": 12
-    },
-    {
-      "id": "6c20fc36-5af1-4ed3-88d0-b7e052cf91f9",
-      "type": "code",
-      "source": "const result = await $`bun packages/app/src/cli.ts install demo.ybk`.text()\r\nconsole.log(result)",
       "outputs": [
         {
           "output_type": "stream",
           "name": "stdout",
           "text": [
-            "\u001b[36m📦 Installing 2 dependencies...\u001b[0m\nbun add v1.3.11 (af24e281)\n\ninstalled lodash@4.17.23\ninstalled dayjs@1.11.20\n\n[4.00ms] done\n\u001b[32m✓ All dependencies installed\u001b[0m\n\n"
+            "✗ Install failed: bun add exited with code 1\n"
           ]
         }
       ],
-      "executionCount": 13
+      "executionCount": 27
+    },
+    {
+      "id": "cell-02-load-model",
+      "type": "code",
+      "source": "// Cell 2: Load a simple sentiment model\nimport { pipeline } from \"@xenova/transformers\"\n\nconsole.log(\"Loading sentiment analysis model...\")\nconst classifier = await pipeline(\"sentiment-analysis\")\nconsole.log(\"Model loaded!\")\nclassifier",
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Loading sentiment analysis model...\nNo model specified. Using default model: \"Xenova/distilbert-base-uncased-finetuned-sst-2-english\".\nModel loaded!\n"
+          ]
+        },
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": "[Function: closure]"
+          },
+          "metadata": {},
+          "execution_count": 49,
+          "richOutput": {
+            "type": "text",
+            "text": "[object Function]"
+          }
+        }
+      ],
+      "executionCount": 49
+    },
+    {
+      "id": "cell-03-inference",
+      "type": "code",
+      "source": "// Cell 3: Run inference\nconst texts = [\n  \"I love yeastbook, it's amazing!\",\n  \"This notebook is terrible and broken.\",\n  \"The weather today is okay I guess.\",\n  \"Bun runtime is incredibly fast!\",\n]\n\nconst results = await classifier(texts)\nresults",
+      "outputs": [],
+      "executionCount": 50
+    },
+    {
+      "id": "cell-04-table",
+      "type": "code",
+      "source": "// Cell 4: Visualize results as table\nconst tableData = texts.map((text, i) => ({\n  text: text.slice(0, 40) + \"...\",\n  label: results[i].label,\n  score: (results[i].score * 100).toFixed(1) + \"%\",\n}))\ntableData",
+      "outputs": [],
+      "executionCount": 51
+    },
+    {
+      "id": "cell-05-chart",
+      "type": "code",
+      "source": "// Cell 5: Visualize as chart\nconst positive = results.filter(r => r.label === \"POSITIVE\").length\nconst negative = results.filter(r => r.label === \"NEGATIVE\").length\n\n;({\n  __type: \"chart\",\n  data: [positive, negative],\n  config: {\n    chartType: \"doughnut\",\n    label: \"Sentiment Distribution\",\n    title: \"Sentiment Analysis Results\",\n  }\n})",
+      "outputs": [],
+      "executionCount": 52
+    },
+    {
+      "id": "cell-06-benchmark",
+      "type": "code",
+      "source": "// Cell 6: Benchmark inference speed\n%timeit -n5 await classifier([\"Yeastbook is fast!\"])",
+      "outputs": [],
+      "executionCount": 53
+    },
+    {
+      "id": "cell-07-multilingual",
+      "type": "code",
+      "source": "// Cell 7: Test với tiếng Việt (multilingual model)\n%install @xenova/transformers\n\nconst multiClassifier = await pipeline(\n  \"text-classification\",\n  \"Xenova/bert-base-multilingual-uncased-sentiment\"\n)\n\nconst vnTexts = [\n  \"Tôi rất thích dùng yeastbook\",\n  \"Notebook này bị lỗi quá nhiều\",\n  \"Bun runtime chạy rất nhanh\",\n]\n\nconst vnResults = await multiClassifier(vnTexts)\nvnResults.map((r, i) => ({\n  text: vnTexts[i],\n  stars: r.label,\n  confidence: (r.score * 100).toFixed(1) + \"%\"\n}))",
+      "outputs": [],
+      "executionCount": 55
+    },
+    {
+      "id": "cell-08-ner",
+      "type": "code",
+      "source": "// Cell 8: Token classification (NER)\nconst ner = await pipeline(\"token-classification\", \"Xenova/bert-base-NER\")\n\nconst sentence = \"Anthropic built Claude and acquired Bun runtime for TypeScript development.\"\nconst entities = await ner(sentence)\n\nentities\n  .filter(e => e.score > 0.8)\n  .map(e => ({\n    word: e.word,\n    entity: e.entity,\n    score: (e.score * 100).toFixed(1) + \"%\"\n  }))",
+      "outputs": [],
+      "executionCount": 54
+    },
+    {
+      "id": "cell-09-embeddings",
+      "type": "code",
+      "source": "// Cell 9: Embeddings + cosine similarity\nconst embedder = await pipeline(\"feature-extraction\", \"Xenova/all-MiniLM-L6-v2\")\n\nconst sentences = [\n  \"Yeastbook is a TypeScript notebook\",\n  \"A notebook for writing code in TypeScript\",\n  \"I like eating bread for breakfast\",\n]\n\nconst embeddings = await embedder(sentences, { pooling: \"mean\", normalize: true })\n\n// Cosine similarity\nfunction cosineSim(a: number[], b: number[]): number {\n  const dot = a.reduce((sum, v, i) => sum + v * b[i], 0)\n  const normA = Math.sqrt(a.reduce((s, v) => s + v * v, 0))\n  const normB = Math.sqrt(b.reduce((s, v) => s + v * v, 0))\n  return dot / (normA * normB)\n}\n\nconst e = embeddings.tolist()\nconsole.log(\"Similarity [0] vs [1]:\", cosineSim(e[0], e[1]).toFixed(4))\nconsole.log(\"Similarity [0] vs [2]:\", cosineSim(e[0], e[2]).toFixed(4))\nconsole.log(\"→ Sentences 0 and 1 should be more similar\")",
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Similarity [0] vs [1]: 0.6104\nSimilarity [0] vs [2]: 0.2397\n→ Sentences 0 and 1 should be more similar\n"
+          ]
+        }
+      ],
+      "executionCount": 57
+    },
+    {
+      "id": "cell-10-memory",
+      "type": "code",
+      "source": "// Cell 10: Memory usage summary\nconst { heapUsed, heapTotal } = process.memoryUsage()\nconsole.log(`Heap used:  ${(heapUsed / 1024 / 1024).toFixed(1)} MB`)\nconsole.log(`Heap total: ${(heapTotal / 1024 / 1024).toFixed(1)} MB`)\nconsole.log(`Bun version: ${Bun.version}`)",
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Heap used:  28.0 MB\nHeap total: 7.5 MB\nBun version: 1.3.11\n"
+          ]
+        }
+      ],
+      "executionCount": 57
     }
   ]
 }

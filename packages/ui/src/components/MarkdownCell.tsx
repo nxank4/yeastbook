@@ -53,10 +53,11 @@ export function MarkdownCell({ cell, isPresenting, onUpdate, onDelete, onMoveUp,
   };
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    if (isPresenting) return;
     e.preventDefault();
     e.stopPropagation();
     setCtxMenu({ x: e.clientX, y: e.clientY });
-  }, []);
+  }, [isPresenting]);
 
   const showNativeMenu = useCallback(() => {
     if (!ctxMenu) return;

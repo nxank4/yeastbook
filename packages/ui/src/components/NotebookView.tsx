@@ -160,41 +160,41 @@ export function NotebookView({
                   isCommandFocused={mode === "command" && focusedCellId === cell.id}
                   isPresenting={isPresenting}
                   dragHandleRef={dragHandleRef}
-                  onModeChange={onModeChange}
-                  onRun={onRunCell}
-                  onRunAndAdvance={onRunAndAdvance}
-                  onSourceChange={onSourceChange}
-                  onDelete={onDeleteCell}
-                  onClear={onClearOutput}
-                  onMoveUp={idx > 0 ? () => onMoveCell(cell.id, "up") : undefined}
-                  onMoveDown={idx < cells.length - 1 ? () => onMoveCell(cell.id, "down") : undefined}
-                  onRunAllAbove={() => onRunAllAbove(cell.id)}
-                  onRunAllBelow={() => onRunAllBelow(cell.id)}
-                  onInterrupt={onInterrupt}
-                  onChangeType={() => onChangeCellType("markdown", cell.id)}
+                  onModeChange={isPresenting ? () => {} : onModeChange}
+                  onRun={isPresenting ? () => {} : onRunCell}
+                  onRunAndAdvance={isPresenting ? () => {} : onRunAndAdvance}
+                  onSourceChange={isPresenting ? () => {} : onSourceChange}
+                  onDelete={isPresenting ? () => {} : onDeleteCell}
+                  onClear={isPresenting ? () => {} : onClearOutput}
+                  onMoveUp={isPresenting ? undefined : idx > 0 ? () => onMoveCell(cell.id, "up") : undefined}
+                  onMoveDown={isPresenting ? undefined : idx < cells.length - 1 ? () => onMoveCell(cell.id, "down") : undefined}
+                  onRunAllAbove={isPresenting ? () => {} : () => onRunAllAbove(cell.id)}
+                  onRunAllBelow={isPresenting ? () => {} : () => onRunAllBelow(cell.id)}
+                  onInterrupt={isPresenting ? () => {} : onInterrupt}
+                  onChangeType={isPresenting ? () => {} : () => onChangeCellType("markdown", cell.id)}
                   onHistoryPush={onHistoryPush}
-                  onRunAll={onRunAll}
+                  onRunAll={isPresenting ? () => {} : onRunAll}
                   onSave={onSave}
                   onOpenPalette={onOpenPalette}
-                  onCut={() => onCutCell(cell.id)}
+                  onCut={isPresenting ? () => {} : () => onCutCell(cell.id)}
                   onCopy={() => onCopyCell(cell.id)}
-                  onPasteBelow={() => onPasteCellBelow(cell.id)}
+                  onPasteBelow={isPresenting ? () => {} : () => onPasteCellBelow(cell.id)}
                   hasClipboard={hasClipboard}
-                  onInsertAbove={(type) => onInsertCellAt(type, "above", cell.id)}
-                  onInsertBelow={(type) => onInsertCellAt(type, "below", cell.id)}
+                  onInsertAbove={isPresenting ? () => {} : (type) => onInsertCellAt(type, "above", cell.id)}
+                  onInsertBelow={isPresenting ? () => {} : (type) => onInsertCellAt(type, "below", cell.id)}
                 />
               ) : (
                 <MarkdownCell
                   cell={cell}
                   isPresenting={isPresenting}
                   dragHandleRef={dragHandleRef}
-                  onUpdate={onUpdateMarkdown}
-                  onDelete={onDeleteCell}
-                  onMoveUp={idx > 0 ? () => onMoveCell(cell.id, "up") : undefined}
-                  onMoveDown={idx < cells.length - 1 ? () => onMoveCell(cell.id, "down") : undefined}
-                  onChangeType={() => onChangeCellType("code", cell.id)}
+                  onUpdate={isPresenting ? () => {} : onUpdateMarkdown}
+                  onDelete={isPresenting ? () => {} : onDeleteCell}
+                  onMoveUp={isPresenting ? undefined : idx > 0 ? () => onMoveCell(cell.id, "up") : undefined}
+                  onMoveDown={isPresenting ? undefined : idx < cells.length - 1 ? () => onMoveCell(cell.id, "down") : undefined}
+                  onChangeType={isPresenting ? () => {} : () => onChangeCellType("code", cell.id)}
                   onCopy={() => onCopyCell(cell.id)}
-                  onInsertBelow={(type) => onInsertCellAt(type, "below", cell.id)}
+                  onInsertBelow={isPresenting ? () => {} : (type) => onInsertCellAt(type, "below", cell.id)}
                 />
               )}
             </div>

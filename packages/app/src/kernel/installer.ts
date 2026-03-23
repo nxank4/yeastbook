@@ -55,7 +55,18 @@ export async function installPackages(
     await Promise.all([stdoutReader, stderrReader]);
     const exitCode = await proc.exited;
 
-    if (exitCode === 0) {
+    // Check which packages were actually installed (bun can exit non-zero but still install some)
+    const versions: Record<string, string> = {};
+    for (const pkg of packages) {
+      try {
+        const pkgJson = await Bun.file(resolve("node_modules", pkg, "package.json")).json();
+        if (pkgJson.version) versions[pkg] = pkgJson.version;
+      } catch {}
+    }
+
+    const allInstalled = Object.keys(versions).length === packages.length;
+
+    if (exitCode === 0 || allInstalled) {
       // Silently try to install @types packages for better editor support
       for (const pkg of packages) {
         if (pkg.startsWith("@")) continue; // Skip scoped packages
@@ -65,14 +76,6 @@ export async function installPackages(
             stderr: "ignore",
           });
           await typesProc.exited;
-        } catch {}
-      }
-      // Read installed versions from node_modules
-      const versions: Record<string, string> = {};
-      for (const pkg of packages) {
-        try {
-          const pkgJson = await Bun.file(resolve("node_modules", pkg, "package.json")).json();
-          if (pkgJson.version) versions[pkg] = pkgJson.version;
         } catch {}
       }
       return { success: true, versions };

@@ -240,6 +240,29 @@ export function MenuBar(props: Props) {
     },
   ];
 
+  const copyNotebook = useCallback((mode: "inputs" | "outputs" | "both") => {
+    const parts: string[] = [];
+    for (const cell of props.cells) {
+      const src = cell.source.join("\n");
+      const out = (cell.outputs || []).map((o: any) => {
+        if (o.output_type === "stream") return (o.text || []).join("");
+        if (o.output_type === "execute_result") return o.data?.["text/plain"] ?? "";
+        if (o.output_type === "error") return `${o.ename}: ${o.evalue}`;
+        return "";
+      }).filter(Boolean).join("\n");
+      if (mode === "inputs") { if (src.trim()) parts.push(src); }
+      else if (mode === "outputs") { if (out.trim()) parts.push(out); }
+      else {
+        const lines: string[] = [];
+        if (src.trim()) lines.push(`// [${cell.cell_type}]\n${src}`);
+        if (out.trim()) lines.push(`// [output]\n${out}`);
+        if (lines.length) parts.push(lines.join("\n"));
+      }
+    }
+    navigator.clipboard.writeText(parts.join("\n\n"));
+    closeAll();
+  }, [props.cells, closeAll]);
+
   return (
     <>
       <div className="menubar" ref={barRef}>
@@ -296,6 +319,38 @@ export function MenuBar(props: Props) {
             )}
           </div>
         ))}
+        <div className="menubar-actions">
+          <div className="menu-container">
+            <button
+              className={`menubar-action-btn ${openMenu === "_copy" ? "active" : ""}`}
+              onClick={() => setOpenMenu(openMenu === "_copy" ? null : "_copy")}
+              title="Copy notebook content"
+            >
+              <i className="bi bi-clipboard" /> Copy
+            </button>
+            {openMenu === "_copy" && (
+              <div className="menu-dropdown">
+                <button className="menu-item" onClick={() => copyNotebook("inputs")}>
+                  <span className="menu-item-label"><i className="bi bi-code-slash" /> Copy Inputs</span>
+                </button>
+                <button className="menu-item" onClick={() => copyNotebook("outputs")}>
+                  <span className="menu-item-label"><i className="bi bi-terminal" /> Copy Outputs</span>
+                </button>
+                <button className="menu-item" onClick={() => copyNotebook("both")}>
+                  <span className="menu-item-label"><i className="bi bi-files" /> Copy Both</span>
+                </button>
+              </div>
+            )}
+          </div>
+          <button
+            className="menubar-action-btn"
+            onClick={() => { props.onRunAll(); }}
+            disabled={props.runningAll}
+            title="Run All Cells"
+          >
+            <i className="bi bi-fast-forward-fill" /> Run All
+          </button>
+        </div>
       </div>
       {showOpenFile && (
         <div className="open-file-overlay" onClick={() => setShowOpenFile(false)}>

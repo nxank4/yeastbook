@@ -534,6 +534,7 @@ export async function startServer(filePath: string, port: number = 3000, devMode
       },
       "/api/types/bun": {
         GET: async () => {
+          const typeHeaders = { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=86400" };
           const paths = [
             resolve(import.meta.dirname!, "../../../node_modules/bun-types/types.d.ts"),
             resolve(import.meta.dirname!, "../../../node_modules/bun-types/index.d.ts"),
@@ -541,6 +542,8 @@ export async function startServer(filePath: string, port: number = 3000, devMode
             resolve(process.cwd(), "node_modules/bun-types/index.d.ts"),
             resolve(process.cwd(), "node_modules/@types/bun/index.d.ts"),
             resolve(import.meta.dirname!, "../../../node_modules/@types/bun/index.d.ts"),
+            resolve(process.cwd(), "../../node_modules/bun-types/types.d.ts"),
+            resolve(process.cwd(), "../../node_modules/@types/bun/index.d.ts"),
           ];
           for (const p of paths) {
             try {
@@ -548,14 +551,42 @@ export async function startServer(filePath: string, port: number = 3000, devMode
               if (await file.exists()) {
                 const content = await file.text();
                 if (content.length > 100) {
-                  return new Response(content, {
-                    headers: { "Content-Type": "text/plain; charset=utf-8" },
-                  });
+                  return new Response(content, { headers: typeHeaders });
                 }
               }
             } catch {}
           }
-          return new Response("", { status: 404 });
+          return new Response(`
+declare namespace Bun {
+  const version: string;
+  const revision: string;
+  function file(path: string | URL): BunFile;
+  function write(path: string | BunFile, data: string | Blob | ArrayBuffer | ArrayBufferView): Promise<number>;
+  function serve(options: any): any;
+  function spawn(cmd: string[], options?: any): any;
+  function inspect(value: unknown, options?: { colors?: boolean; depth?: number }): string;
+  function sleep(ms: number): Promise<void>;
+  function sleepSync(ms: number): void;
+  function hash(data: string | ArrayBuffer | ArrayBufferView, seed?: number): number | bigint;
+  function build(options: any): Promise<any>;
+  const env: Record<string, string | undefined>;
+  const argv: string[];
+  const main: string;
+  const password: { hash(password: string): Promise<string>; verify(password: string, hash: string): Promise<boolean>; };
+}
+interface BunFile extends Blob {
+  readonly name: string; readonly size: number; readonly type: string;
+  text(): Promise<string>; json<T = unknown>(): Promise<T>; arrayBuffer(): Promise<ArrayBuffer>;
+  exists(): Promise<boolean>; stream(): ReadableStream;
+}
+declare const $: { (strings: TemplateStringsArray, ...values: unknown[]): ShellPromise };
+interface ShellPromise extends Promise<ShellOutput> { text(): Promise<string>; json<T = unknown>(): Promise<T>; lines(): Promise<string[]>; }
+interface ShellOutput { stdout: Buffer; stderr: Buffer; exitCode: number; text(): string; }
+declare function createSlider(config: { min: number; max: number; value?: number; step?: number; label?: string }): any;
+declare function createInput(config: { value?: string; placeholder?: string; label?: string }): any;
+declare function createToggle(config: { value?: boolean; label?: string }): any;
+declare function createSelect(config: { options: string[]; value?: string; label?: string }): any;
+`, { headers: typeHeaders });
         },
       },
       "/api/plugins": {
@@ -685,7 +716,13 @@ export async function startServer(filePath: string, port: number = 3000, devMode
         try {
           const msg = JSON.parse(message as string) as
             | { type: "execute"; cellId: string; code: string }
-            | { type: "interrupt" };
+            | { type: "interrupt" }
+            | { type: "ping"; ts: number };
+
+          if (msg.type === "ping") {
+            ws.send(JSON.stringify({ type: "pong", ts: msg.ts }));
+            return;
+          }
 
           if (msg.type === "execute") {
             // Parse magic commands

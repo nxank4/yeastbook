@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo, Profiler } from "react";
 import { NotebookView } from "./components/NotebookView.tsx";
 import { EditableFileName } from "./components/EditableFileName.tsx";
 import { SettingsPanel } from "./components/SettingsPanel.tsx";
@@ -9,9 +9,12 @@ import { EnvExplorer } from "./components/EnvExplorer.tsx";
 import { DependenciesPanel } from "./components/DependenciesPanel.tsx";
 import { VariableExplorer } from "./components/VariableExplorer.tsx";
 import { FileExplorer } from "./components/FileExplorer.tsx";
+import { PerfHUD } from "./components/PerfHUD.tsx";
 import { useWebSocket } from "./useWebSocket.ts";
 import { useKeyboardShortcuts, type Mode } from "./hooks/useKeyboardShortcuts.ts";
 import { useHistory } from "./hooks/useHistory.ts";
+import { useDebugMode } from "./hooks/useDebugMode.ts";
+import { usePerfMetrics } from "./hooks/usePerfMetrics.ts";
 import type { Cell, CellOutput, WsIncoming, Settings } from "@yeastbook/core";
 import { DEFAULT_SETTINGS } from "@yeastbook/core";
 
@@ -49,7 +52,8 @@ export function App() {
   );
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(true);
   const [fileTreeVersion, setFileTreeVersion] = useState(0);
-  const runAllResolveRef = useRef<(() => void) | null>(null);
+  const runAllResolveRef = useRef<((hadError: boolean) => void) | null>(null);
+  const runAllCellErrorRef = useRef(false);
   const runAllAbortedRef = useRef(false);
 
   useEffect(() => {
@@ -146,8 +150,12 @@ export function App() {
   }, [settings.layout?.maxWidth, settings.layout?.customWidth]);
 
   // --- WebSocket ---
+  const perfRef = useRef<{ recordPong: (ts: number) => void; recordExecStart: (id: string) => void; recordExecEnd: (id: string) => void }>({ recordPong: () => {}, recordExecStart: () => {}, recordExecEnd: () => {} });
   const handleWsMessage = useCallback((msg: WsIncoming) => {
     switch (msg.type) {
+      case "pong":
+        perfRef.current.recordPong(msg.ts);
+        break;
       case "status":
         setBusyCells((prev) => {
           const next = new Set(prev);
@@ -156,11 +164,14 @@ export function App() {
           return next;
         });
         if (msg.status === "idle") {
+          perfRef.current.recordExecEnd(msg.cellId);
           setSaved(true);
           if (runAllResolveRef.current) {
             const resolve = runAllResolveRef.current;
+            const hadError = runAllCellErrorRef.current;
             runAllResolveRef.current = null;
-            resolve();
+            runAllCellErrorRef.current = false;
+            resolve(hadError);
           }
           if (msg.executionCount != null) {
             setCells((prev) =>
@@ -219,6 +230,10 @@ export function App() {
         );
         break;
       case "error":
+        // Flag error for run-all abort (before idle status arrives)
+        if (runAllResolveRef.current) {
+          runAllCellErrorRef.current = true;
+        }
         setLiveOutputs((prev) => {
           const next = new Map(prev);
           const existing = next.get(msg.cellId) || [];
@@ -257,6 +272,11 @@ export function App() {
           const state = next.get(msg.cellId);
           if (state) {
             next.set(msg.cellId, { ...state, done: true });
+            // Persist install output to cell outputs so copy/export captures it
+            const text = state.logs.join("") + `\nInstalled ${state.packages.join(", ")}\n`;
+            setCells((prevCells) => prevCells.map((c) =>
+              c.id === msg.cellId ? { ...c, outputs: [{ output_type: "stream", name: "stdout", text: [text] }] } : c
+            ));
           }
           return next;
         });
@@ -267,6 +287,11 @@ export function App() {
           const state = next.get(msg.cellId);
           if (state) {
             next.set(msg.cellId, { ...state, done: true, error: msg.error });
+            // Persist error to cell outputs
+            const text = state.logs.join("") + `\nInstall failed: ${msg.error}\n`;
+            setCells((prevCells) => prevCells.map((c) =>
+              c.id === msg.cellId ? { ...c, outputs: [{ output_type: "stream", name: "stderr", text: [text] }] } : c
+            ));
           }
           return next;
         });
@@ -301,6 +326,11 @@ export function App() {
 
   const { send, connected } = useWebSocket(handleWsMessage);
 
+  // --- Debug / Performance ---
+  const { enabled: debugEnabled, toggle: toggleDebug } = useDebugMode();
+  const perfMetrics = usePerfMetrics(debugEnabled, send);
+  perfRef.current = perfMetrics;
+
   // --- Load notebook ---
   const loadNotebookData = useCallback((data: any) => {
     setCells(data.cells || []);
@@ -317,20 +347,20 @@ export function App() {
   // --- Cell operations ---
   const handleRunCell = useCallback(
     (cellId: string, code: string) => {
-      if (settings.execution.clearOutputBeforeRun) {
-        setCells((prev) =>
-          prev.map((c) => (c.id === cellId ? { ...c, outputs: [] } : c))
-        );
-      }
+      // Always clear previous outputs when starting a new run
+      setCells((prev) =>
+        prev.map((c) => (c.id === cellId ? { ...c, outputs: [] } : c))
+      );
       setLiveOutputs((prev) => {
         const next = new Map(prev);
         next.set(cellId, []);
         return next;
       });
       setSaved(false);
+      perfRef.current.recordExecStart(cellId);
       send({ type: "execute", cellId, code });
     },
-    [send, settings.execution.clearOutputBeforeRun]
+    [send]
   );
 
   const focusCellEditor = useCallback((targetCellId: string) => {
@@ -497,18 +527,23 @@ export function App() {
 
   const runCellSequence = useCallback(async (codeCells: Cell[]) => {
     runAllAbortedRef.current = false;
+    runAllCellErrorRef.current = false;
     setRunningAll(true);
     for (const cell of codeCells) {
       if (runAllAbortedRef.current) break;
       const code = cell.source.join("\n");
       if (!code.trim()) continue;
-      await new Promise<void>((resolve) => {
+      const hadError = await new Promise<boolean>((resolve) => {
         runAllResolveRef.current = resolve;
         handleRunCell(cell.id, code);
       });
+      if (hadError) {
+        showToast("Run All stopped — cell error");
+        break;
+      }
     }
     setRunningAll(false);
-  }, [handleRunCell]);
+  }, [handleRunCell, showToast]);
 
   const handleRunAll = useCallback(async () => {
     const currentCells = await new Promise<Cell[]>((resolve) => {
@@ -914,6 +949,7 @@ export function App() {
     focusedCellId,
     busyCells,
     mode,
+    isPresenting,
     onSetMode: setMode,
     onAddCellAbove: handleAddCellAbove,
     onAddCellBelow: handleAddCellBelow,
@@ -1002,6 +1038,7 @@ export function App() {
       />
       <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
       <AboutModal open={aboutOpen} onClose={() => setAboutOpen(false)} version={version} bunVersion={bunVersion} />
+      <Profiler id="notebook" onRender={perfMetrics.onProfilerRender}>
       <div className="notebook-layout">
       {!isPresenting && !leftSidebarOpen && (
         <button
@@ -1062,9 +1099,11 @@ export function App() {
         </div>
       )}
       </div>
+      </Profiler>
       {toast && settings.appearance.notifications === "show" && <div className="toast">{toast}</div>}
       {!isPresenting && <StatusBar mode={mode} connected={connected} saved={saved} notification={settings.appearance.notifications === "minimize" ? toast : null} />}
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} commands={paletteCommands} />
+      {debugEnabled && <PerfHUD metrics={perfMetrics.metrics} />}
     </>
   );
 }

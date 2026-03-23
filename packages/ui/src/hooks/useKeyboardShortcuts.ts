@@ -7,6 +7,7 @@ interface ShortcutHandlers {
   focusedCellId: string | null;
   busyCells: Set<string>;
   mode: Mode;
+  isPresenting?: boolean;
   onSetMode: (mode: Mode) => void;
   onAddCellAbove: () => void;
   onAddCellBelow: () => void;
@@ -52,6 +53,10 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
         h.onTogglePresentation();
         return;
       }
+
+      // Presentation mode: block all other shortcuts
+      if (h.isPresenting) return;
+
       if ((e.ctrlKey || e.metaKey) && (e.key === "b" || e.key === "B") && !e.shiftKey) {
         e.preventDefault();
         h.onToggleFileExplorer();

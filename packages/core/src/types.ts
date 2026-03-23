@@ -92,4 +92,5 @@ export type WsIncoming =
   | { type: "files_changed" }
   | { type: "dependencies_updated"; dependencies: Record<string, string> }
   | { type: "snapshot_restored"; restoredCount: number; variables: Record<string, { value: unknown; type: string; serializable: boolean }> }
-  | { type: "variables_updated"; variables: Record<string, { value: unknown; type: string; serializable: boolean }> };
+  | { type: "variables_updated"; variables: Record<string, { value: unknown; type: string; serializable: boolean }> }
+  | { type: "pong"; ts: number };

@@ -41,10 +41,15 @@ export function ContextMenu({ x, y, items, onClose }: Props) {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
+    const handleContextMenu = (e: MouseEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) onClose();
+    };
     document.addEventListener("mousedown", handleClick);
+    document.addEventListener("contextmenu", handleContextMenu, true);
     document.addEventListener("keydown", handleKey);
     return () => {
       document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("contextmenu", handleContextMenu, true);
       document.removeEventListener("keydown", handleKey);
     };
   }, [onClose]);
