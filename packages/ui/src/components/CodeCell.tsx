@@ -353,25 +353,22 @@ export function CodeCell({
           <button onClick={() => setAiPromptOpen(false)} className="ai-cancel-btn">Cancel</button>
         </div>
       )}
-      {installing && !installing.done && (
-        <div className="install-progress">
-          <div className="install-header">
-            <span className="busy-indicator" />
-            Installing {installing.packages.join(", ")}...
+      {installing && (
+        <div className="output-section">
+          <div className="output-area">
+            {!installing.done && (
+              <div className="output-stdout"><span className="busy-indicator" /> Installing {installing.packages.join(", ")}...</div>
+            )}
+            {installing.logs.length > 0 && (
+              <div className="output-stdout">{installing.logs.join("")}</div>
+            )}
+            {installing.done && !installing.error && (
+              <div className="output-stdout">Installed {installing.packages.join(", ")}</div>
+            )}
+            {installing.done && installing.error && (
+              <div className="output-stderr">Install failed: {installing.error}</div>
+            )}
           </div>
-          {installing.logs.length > 0 && (
-            <pre className="install-logs">{installing.logs.join("")}</pre>
-          )}
-        </div>
-      )}
-      {installing?.done && installing.error && (
-        <div className="install-error-banner">
-          <i className="bi bi-x-circle" /> Install failed: {installing.error}
-        </div>
-      )}
-      {installing?.done && !installing.error && (
-        <div className="install-success-banner">
-          <i className="bi bi-check-circle" /> Installed {installing.packages.join(", ")}
         </div>
       )}
       <div className="code-area">

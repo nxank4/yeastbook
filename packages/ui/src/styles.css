@@ -1195,46 +1195,6 @@ input, textarea, select {
   color: var(--text-muted); font-size: 13px;
 }
 
-/* --- Install Progress --- */
-.install-progress {
-  border-top: 1px solid var(--border-light);
-  padding: 8px 12px;
-  background: var(--bg-toolbar);
-  font-size: 12px;
-}
-
-.install-header {
-  display: flex; align-items: center; gap: 6px;
-  color: var(--text-secondary);
-  font-weight: 500;
-}
-
-.install-logs {
-  margin-top: 6px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px; line-height: 1.4;
-  color: var(--text-muted);
-  white-space: pre-wrap;
-  max-height: 120px;
-  overflow-y: auto;
-}
-
-.install-success-banner {
-  border-top: 1px solid var(--border-light);
-  padding: 6px 12px;
-  font-size: 12px;
-  color: var(--status-success);
-  background: rgba(22, 163, 74, 0.05);
-}
-
-.install-error-banner {
-  border-top: 1px solid var(--border-light);
-  padding: 6px 12px;
-  font-size: 12px;
-  color: var(--status-error);
-  background: var(--error-bg);
-}
-
 /* --- JSON Tree --- */
 .output-rich {
   padding: 4px 0;
@@ -1532,11 +1492,6 @@ input, textarea, select {
   display: none !important;
 }
 
-.presentation-mode .install-progress,
-.presentation-mode .install-success-banner,
-.presentation-mode .install-error-banner {
-  display: none !important;
-}
 
 /* Markdown: larger, more readable */
 .presentation-mode .markdown-rendered {
