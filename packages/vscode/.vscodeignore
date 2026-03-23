@@ -1,7 +1,6 @@
-.vscode/**
-src/**
-tsconfig.json
-icon.svg
-*.vsix
-node_modules/**
-!dist/**
+**
+!dist/extension.js
+!package.json
+!icon.png
+!icon-small.png
+!LICENSE.txt

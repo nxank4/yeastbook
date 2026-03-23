@@ -3,7 +3,7 @@
   "displayName": "Yeastbook",
   "description": "TypeScript notebooks powered by Bun",
   "version": "0.0.1",
-  "publisher": "yeastbook",
+  "publisher": "codepawl",
   "repository": {
     "type": "git",
     "url": "https://github.com/nxank4/yeastbook.git",
