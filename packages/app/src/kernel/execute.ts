@@ -3,6 +3,16 @@
 import { $ } from "bun";
 import { transformCellCode, createSlider, createInput, createToggle, createSelect } from "@yeastbook/core";
 
+// Verify transform module loaded correctly at startup
+const _verifyTransform = transformCellCode("const _v = 1");
+if (!_verifyTransform.includes("globalThis._v")) {
+  process.stderr.write(`\x1b[31m[FATAL] transformCellCode is NOT hoisting to globalThis!\x1b[0m\n`);
+  process.stderr.write(`Output: ${_verifyTransform}\n`);
+  process.stderr.write(`Module resolution may be stale. Try: rm -rf node_modules && bun install\n`);
+} else {
+  process.stderr.write(`\x1b[32m[OK] transformCellCode globalThis hoisting verified\x1b[0m\n`);
+}
+
 // Interrupt mechanism — allows cancelling execution between async yields
 let interruptReject: ((err: Error) => void) | null = null;
 
