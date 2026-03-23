@@ -534,16 +534,28 @@ export async function startServer(filePath: string, port: number = 3000, devMode
       },
       "/api/types/bun": {
         GET: async () => {
-          try {
-            const typesPath = resolve(import.meta.dirname!, "../../../node_modules/@types/bun/index.d.ts");
-            const file = Bun.file(typesPath);
-            if (await file.exists()) {
-              return new Response(await file.text(), {
-                headers: { "Content-Type": "text/plain; charset=utf-8" },
-              });
-            }
-          } catch {}
-          return new Response("", { headers: { "Content-Type": "text/plain" } });
+          const paths = [
+            resolve(import.meta.dirname!, "../../../node_modules/bun-types/types.d.ts"),
+            resolve(import.meta.dirname!, "../../../node_modules/bun-types/index.d.ts"),
+            resolve(process.cwd(), "node_modules/bun-types/types.d.ts"),
+            resolve(process.cwd(), "node_modules/bun-types/index.d.ts"),
+            resolve(process.cwd(), "node_modules/@types/bun/index.d.ts"),
+            resolve(import.meta.dirname!, "../../../node_modules/@types/bun/index.d.ts"),
+          ];
+          for (const p of paths) {
+            try {
+              const file = Bun.file(p);
+              if (await file.exists()) {
+                const content = await file.text();
+                if (content.length > 100) {
+                  return new Response(content, {
+                    headers: { "Content-Type": "text/plain; charset=utf-8" },
+                  });
+                }
+              }
+            } catch {}
+          }
+          return new Response("", { status: 404 });
         },
       },
       "/api/plugins": {

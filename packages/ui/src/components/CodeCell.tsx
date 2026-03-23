@@ -82,7 +82,7 @@ export function CodeCell({
       noSemanticValidation: false,
       noSyntaxValidation: false,
       noSuggestionDiagnostics: true,
-      diagnosticCodesToIgnore: [2307, 2304, 1378, 2580, 7044],
+      diagnosticCodesToIgnore: [2307, 2304, 1378, 2580, 7044, 2686],
     };
     monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions(diagOpts);
     monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions(diagOpts);
@@ -101,23 +101,187 @@ export function CodeCell({
 
     monaco.languages.typescript.typescriptDefaults.setEagerModelSync(false);
     monaco.languages.typescript.javascriptDefaults.setEagerModelSync(false);
+
+    monaco.editor.defineTheme("yeastbook-dark", {
+      base: "vs-dark",
+      inherit: true,
+      rules: [
+        // Comments — muted warm gray, italic
+        { token: "comment", foreground: "5C5A57", fontStyle: "italic" },
+        { token: "comment.doc", foreground: "6B6560", fontStyle: "italic" },
+
+        // Keywords & storage — amber accent
+        { token: "keyword", foreground: "F59E0B" },
+        { token: "keyword.control", foreground: "F59E0B" },
+        { token: "keyword.operator", foreground: "F59E0B" },
+        { token: "storage", foreground: "F59E0B" },
+        { token: "storage.type", foreground: "F59E0B" },
+
+        // Strings — warm sage green
+        { token: "string", foreground: "A8C67F" },
+        { token: "string.escape", foreground: "C4D9A0" },
+        { token: "string.regexp", foreground: "C48A6A" },
+
+        // Numbers & constants — warm peach
+        { token: "number", foreground: "E8A86D" },
+        { token: "number.hex", foreground: "E8A86D" },
+        { token: "constant", foreground: "E8A86D" },
+        { token: "constant.language", foreground: "E8A86D" },
+
+        // Types — warm sky blue
+        { token: "type", foreground: "7EB8DA" },
+        { token: "type.identifier", foreground: "7EB8DA" },
+        { token: "support.type", foreground: "7EB8DA" },
+
+        // Functions — golden
+        { token: "entity.name.function", foreground: "D4A857" },
+        { token: "support.function", foreground: "D4A857" },
+
+        // Variables — warm beige (default)
+        { token: "variable", foreground: "E8E4DC" },
+        { token: "variable.parameter", foreground: "D4C8B0" },
+        { token: "identifier", foreground: "E8E4DC" },
+
+        // Operators & punctuation — secondary gray
+        { token: "operator", foreground: "8C8880" },
+        { token: "delimiter", foreground: "8C8880" },
+        { token: "delimiter.bracket", foreground: "8C8880" },
+
+        // JSX/HTML tags & attributes
+        { token: "tag", foreground: "D4A857" },
+        { token: "attribute.name", foreground: "7EB8DA" },
+        { token: "attribute.value", foreground: "A8C67F" },
+
+        // Misc
+        { token: "invalid", foreground: "DC2626" },
+      ],
+      colors: {
+        "editor.background": "#0D0D0C",
+        "editor.foreground": "#E8E4DC",
+        "editorCursor.foreground": "#F59E0B",
+
+        // Selection — amber tint
+        "editor.selectionBackground": "#F59E0B33",
+        "editor.inactiveSelectionBackground": "#F59E0B1A",
+        "editor.selectionHighlightBackground": "#F59E0B1A",
+
+        // Line highlight
+        "editor.lineHighlightBackground": "#1C1C1A",
+        "editor.lineHighlightBorder": "#00000000",
+
+        // Line numbers
+        "editorLineNumber.foreground": "#5C5A57",
+        "editorLineNumber.activeForeground": "#8C8880",
+
+        // Indent guides
+        "editorIndentGuide.background": "#2C2A27",
+        "editorIndentGuide.activeBackground": "#3A3836",
+
+        // Widgets (autocomplete, hover)
+        "editorWidget.background": "#1C1C1A",
+        "editorWidget.border": "#2C2A27",
+        "editorSuggestWidget.background": "#1C1C1A",
+        "editorSuggestWidget.border": "#2C2A27",
+        "editorSuggestWidget.selectedBackground": "#F59E0B26",
+        "editorSuggestWidget.highlightForeground": "#F59E0B",
+        "editorHoverWidget.background": "#1C1C1A",
+        "editorHoverWidget.border": "#2C2A27",
+
+        // Find/replace
+        "editor.findMatchBackground": "#F59E0B40",
+        "editor.findMatchHighlightBackground": "#F59E0B20",
+
+        // Bracket matching — amber
+        "editorBracketMatch.background": "#F59E0B26",
+        "editorBracketMatch.border": "#F59E0B66",
+
+        // Scrollbar
+        "scrollbarSlider.background": "#5C5A5733",
+        "scrollbarSlider.hoverBackground": "#5C5A5766",
+
+        // Gutter & ruler
+        "editorGutter.background": "#0D0D0C",
+        "editorOverviewRuler.border": "#00000000",
+
+        // Errors/warnings
+        "editorError.foreground": "#DC2626",
+        "editorWarning.foreground": "#F59E0B",
+        "editorInfo.foreground": "#7EB8DA",
+
+        // Whitespace
+        "editorWhitespace.foreground": "#2C2A27",
+
+        // Input (find bar)
+        "input.background": "#141412",
+        "input.border": "#2C2A27",
+        "focusBorder": "#D97706",
+
+        // List (autocomplete rows)
+        "list.hoverBackground": "#F59E0B1A",
+        "list.activeSelectionBackground": "#F59E0B26",
+        "list.highlightForeground": "#F59E0B",
+      },
+    });
   }, []);
 
   const handleEditorMount: OnMount = useCallback((editor, monaco) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
 
-    // Load Bun type definitions
+    // Load Bun type definitions with fallback
+    const addBunTypes = (dts: string, uri: string) => {
+      monaco.languages.typescript.typescriptDefaults.addExtraLib(dts, uri);
+      monaco.languages.typescript.javascriptDefaults.addExtraLib(dts, uri);
+    };
+
     fetch("/api/types/bun")
-      .then((r) => r.text())
+      .then((r) => {
+        if (!r.ok) throw new Error("not found");
+        return r.text();
+      })
       .then((dts) => {
-        if (dts) {
-          monaco.languages.typescript.typescriptDefaults.addExtraLib(
-            dts, "file:///node_modules/@types/bun/index.d.ts"
-          );
+        if (dts && dts.length > 100) {
+          addBunTypes(dts, "file:///node_modules/@types/bun/index.d.ts");
+        } else {
+          throw new Error("stub");
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        // Fallback: inline minimal Bun type declarations
+        const bunTypes = `
+declare namespace Bun {
+  const version: string;
+  const revision: string;
+  function file(path: string): BunFile;
+  function write(path: string | BunFile, data: string | ArrayBuffer | Blob): Promise<number>;
+  function serve(options: any): any;
+  function spawn(cmd: string[], options?: any): any;
+  function inspect(value: unknown): string;
+  const env: Record<string, string | undefined>;
+  function sleep(ms: number): Promise<void>;
+  function sleepSync(ms: number): void;
+  function hash(data: string | ArrayBuffer): number;
+  function build(options: any): Promise<any>;
+  const password: {
+    hash(password: string): Promise<string>;
+    verify(password: string, hash: string): Promise<boolean>;
+  };
+}
+interface BunFile {
+  text(): Promise<string>;
+  json(): Promise<any>;
+  arrayBuffer(): Promise<ArrayBuffer>;
+  size: number;
+  type: string;
+  exists(): Promise<boolean>;
+}
+declare function createSlider(config: { min: number; max: number; value?: number; step?: number; label?: string }): any;
+declare function createInput(config: { value?: string; placeholder?: string; label?: string }): any;
+declare function createToggle(config: { value?: boolean; label?: string }): any;
+declare function createSelect(config: { options: string[]; value?: string; label?: string }): any;
+`;
+        addBunTypes(bunTypes, "file:///node_modules/bun-globals/index.d.ts");
+      });
 
     // Register shortcuts via capturing DOM listener — fires BEFORE Monaco processes events.
     // This avoids conflicts with Monaco's built-in Shift+Enter, Ctrl+Enter, Escape etc.
@@ -391,7 +555,7 @@ export function CodeCell({
           defaultLanguage="typescript"
           defaultValue={cell.source.join("\n") || ""}
           path={`cell-${cell.id}.ts`}
-          theme="vs-dark"
+          theme="yeastbook-dark"
           beforeMount={handleBeforeMount}
           onMount={handleEditorMount}
           options={{
