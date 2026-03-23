@@ -9,6 +9,10 @@
     },
     "language_info": {
       "name": "typescript"
+    },
+    "dependencies": {
+      "lodash": "^4.17.23",
+      "dayjs": "^1.11.20"
     }
   },
   "cells": [
@@ -30,7 +34,7 @@
           ]
         }
       ],
-      "executionCount": 3
+      "executionCount": 11
     },
     {
       "id": "demo-02-context",
@@ -43,14 +47,14 @@
             "text/plain": "\"Hello from Yeastbook 🍞 — context works!\""
           },
           "metadata": {},
-          "execution_count": 4,
+          "execution_count": 12,
           "richOutput": {
             "type": "text",
             "text": "Hello from Yeastbook 🍞 — context works!"
           }
         }
       ],
-      "executionCount": 4
+      "executionCount": 12
     },
     {
       "id": "demo-03-await",
@@ -63,7 +67,7 @@
             "text/plain": "{\n  userId: 1,\n  id: 1,\n  title: \"delectus aut autem\",\n  completed: false,\n}"
           },
           "metadata": {},
-          "execution_count": 5,
+          "execution_count": 13,
           "richOutput": {
             "type": "json",
             "data": {
@@ -75,7 +79,7 @@
           }
         }
       ],
-      "executionCount": 5
+      "executionCount": 13
     },
     {
       "id": "demo-04-table",
@@ -88,7 +92,7 @@
             "text/plain": "[\n  {\n    name: \"Alice\",\n    age: 30,\n    role: \"admin\",\n  }, {\n    name: \"Bob\",\n    age: 25,\n    role: \"user\",\n  }, {\n    name: \"Charlie\",\n    age: 35,\n    role: \"user\",\n  }\n]"
           },
           "metadata": {},
-          "execution_count": 6,
+          "execution_count": 14,
           "richOutput": {
             "type": "table",
             "rows": [
@@ -111,21 +115,50 @@
           }
         }
       ],
-      "executionCount": 6
+      "executionCount": 14
     },
     {
       "id": "demo-05-chart",
       "type": "code",
       "source": "({\n  __type: \"chart\",\n  data: [12, 19, 8, 15, 22, 18, 25],\n  config: {\n    chartType: \"line\",\n    label: \"Weekly activity\",\n    title: \"User Activity Q1\"\n  }\n})",
       "outputs": [],
-      "executionCount": 5
+      "executionCount": 15
     },
     {
       "id": "demo-06-console-table",
       "type": "code",
       "source": "console.table([\n  { method: \"GET\", endpoint: \"/api/users\", ms: 12 },\n  { method: \"POST\", endpoint: \"/api/login\", ms: 45 },\n  { method: \"DELETE\", endpoint: \"/api/session\", ms: 8 },\n])",
-      "outputs": [],
-      "executionCount": 1
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": ""
+          },
+          "metadata": {},
+          "execution_count": 16,
+          "richOutput": {
+            "type": "table",
+            "rows": [
+              {
+                "method": "GET",
+                "endpoint": "/api/users",
+                "ms": 12
+              },
+              {
+                "method": "POST",
+                "endpoint": "/api/login",
+                "ms": 45
+              },
+              {
+                "method": "DELETE",
+                "endpoint": "/api/session",
+                "ms": 8
+              }
+            ]
+          }
+        }
+      ],
+      "executionCount": 16
     },
     {
       "id": "demo-07-shell",
@@ -136,11 +169,11 @@
           "output_type": "stream",
           "name": "stdout",
           "text": [
-            "drwxr-xr-x  10  1000  1000    +4096 Mar 21 18:42 .\ndrwxrwxrwx   8  1000  1000    +4096 Mar 20 14:26 ..\ndrwxr-xr-x   6  1000  1000    +4096 Mar 21 14:11 packages\ndrwxr-xr-x   2  1000  1000    +4096 Mar 21 18:44 tests\n-rw-r--r--   1  1000  1000    +7977 Mar 21 18:10 bun.lock\n-rw-r--r--   1  1000  1000    +7302 Mar 21 18:11 demo.ipynb\n-rw-r--r--   1  1000  1000    +3101 Mar 21 13:30 CLAUDE.md\n-rw-r--r--   1  1000  1000     +440 Mar 21 17:30 .gitignore\ndrwxr-xr-x   2  1000  1000    +4096 Mar 21 14:11 scripts\n-rw-r--r--   1  1000  1000     +281 Mar 21 17:30 notebook-1774114233945.ybk\ndrwxr-xr-x   6  1000  1000    +4096 Mar 21 17:49 node_modules\n-rw-r--r--   1  1000  1000    +8452 Mar 21 18:48 demo.ybk\ndrwxr-xr-x   3  1000  1000    +4096 Mar 20 14:26 docs\n-rw-r--r--   1  1000  1000    +1876 Mar 21 08:39 README.md\n-rw-r--r--   1  1000  1000    +1107 Mar 21 17:49 package.json\ndrwxr-xr-x   8  1000  1000    +4096 Mar 21 17:00 .git\ndrwxr-xr-x   2  1000  1000    +4096 Mar 21 17:48 .claude\n-rw-r--r--   1  1000  1000      +40 Mar 21 17:34 .yeastbook-dev-notebook\ndrwxr-xr-x   2  1000  1000    +4096 Mar 21 15:41 binaries\n-rw-r--r--   1  1000  1000     +151 Mar 21 08:38 .npmignore\n-rw-r--r--   1  1000  1000     +713 Mar 20 14:26 tsconfig.json\n-rw-r--r--   1  1000  1000      +30 Mar 20 14:26 index.ts\n-rw-r--r--   1  1000  1000     +261 Mar 21 07:19 install\n\n"
+            "drwxr-xr-x   9  1000  1000    +4096 Mar 23 03:24 .\ndrwxr-xr-x  16  1000  1000    +4096 Mar 20 09:47 ..\n-rw-r--r--   1  1000  1000      +30 Mar 20 09:48 index.ts\n-rw-r--r--   1  1000  1000     +261 Mar 23 02:16 install\ndrwxr-xr-x   3  1000  1000    +4096 Mar 20 10:12 docs\ndrwxr-xr-x   2  1000  1000    +4096 Mar 23 03:18 .claude\ndrwxr-xr-x   2  1000  1000    +4096 Mar 23 02:16 scripts\ndrwxr-xr-x   2  1000  1000    +4096 Mar 23 02:16 tests\n-rw-r--r--   1  1000  1000    +7855 Mar 23 02:16 demo.ipynb\n-rw-r--r--   1  1000  1000     +151 Mar 23 02:16 .npmignore\n-rw-r--r--   1  1000  1000      +40 Mar 23 03:24 .yeastbook-dev-notebook\n-rw-r--r--   1  1000  1000    +1876 Mar 23 02:16 README.md\ndrwxr-xr-x   6  1000  1000    +4096 Mar 23 02:17 node_modules\n-rw-r--r--   1  1000  1000    +7977 Mar 23 02:40 bun.lock\n-rw-r--r--   1  1000  1000     +511 Mar 23 02:16 .gitignore\ndrwxr-xr-x   6  1000  1000    +4096 Mar 23 02:16 packages\n-rw-r--r--   1  1000  1000    +1136 Mar 23 03:23 package.json\n-rw-r--r--   1  1000  1000     +713 Mar 20 09:48 tsconfig.json\n-rw-r--r--   1  1000  1000    +3101 Mar 23 02:16 CLAUDE.md\n-rw-r--r--   1  1000  1000   +10409 Mar 23 03:27 demo.ybk\ndrwxr-xr-x   8  1000  1000    +4096 Mar 23 03:24 .git\n\n"
           ]
         }
       ],
-      "executionCount": 7
+      "executionCount": 17
     },
     {
       "id": "demo-08-isolation",
@@ -156,7 +189,7 @@
           ]
         }
       ],
-      "executionCount": 8
+      "executionCount": 18
     },
     {
       "id": "demo-09-widget",
@@ -166,19 +199,81 @@
         {
           "output_type": "execute_result",
           "data": {
-            "text/plain": "{\n  value: 50,\n  __widgetId: \"widget_1_1774119225943\",\n  __type: \"widget\",\n  __widgetType: \"slider\",\n  __config: {\n    min: 0,\n    max: 100,\n    step: 1,\n    label: \"Threshold\",\n  },\n  _callbacks: [],\n  onChange: [Function: onChange],\n  destroy: [Function: destroy],\n}"
+            "text/plain": "{\n  value: 50,\n  __widgetId: \"widget_1_1774236464826\",\n  __type: \"widget\",\n  __widgetType: \"slider\",\n  __config: {\n    min: 0,\n    max: 100,\n    step: 1,\n    label: \"Threshold\",\n  },\n  _callbacks: [],\n  onChange: [Function: onChange],\n  destroy: [Function: destroy],\n}"
           },
           "metadata": {},
-          "execution_count": 3
+          "execution_count": 19,
+          "richOutput": {
+            "type": "widget",
+            "widgetId": "widget_1_1774236464826",
+            "widgetType": "slider",
+            "value": 50,
+            "config": {
+              "min": 0,
+              "max": 100,
+              "step": 1,
+              "label": "Threshold"
+            }
+          }
         }
       ],
-      "executionCount": 3
+      "executionCount": 19
     },
     {
       "id": "demo-10-install",
       "type": "code",
       "source": "%install lodash",
-      "outputs": [],
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "✓ Installed lodash (lodash@4.17.23)\n"
+          ]
+        },
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "✓ Installed lodash (lodash@4.17.23)\n"
+          ]
+        },
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "✓ Installed lodash (lodash@4.17.23)\n"
+          ]
+        },
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "✓ Installed lodash (lodash@4.17.23)\n"
+          ]
+        },
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "✓ Installed lodash (lodash@4.17.23)\n"
+          ]
+        },
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "✓ Installed lodash (lodash@4.17.23)\n"
+          ]
+        },
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "✓ Installed lodash (lodash@4.17.23)\n"
+          ]
+        }
+      ],
       "executionCount": null
     },
     {
@@ -187,16 +282,29 @@
       "source": "import _ from \"lodash\"\n_.chunk([1,2,3,4,5,6], 2)",
       "outputs": [
         {
-          "output_type": "error",
-          "ename": "SyntaxError",
-          "evalue": "Unexpected identifier '_'. import call expects one or two arguments.",
-          "traceback": [
-            "SyntaxError: Unexpected identifier '_'. import call expects one or two arguments.",
-            "    at <parse> (:4)",
-            "    at AsyncFunction (unknown)",
-            "    at executeCode (/home/nxank4/personal/yeastbook/packages/app/src/kernel/execute.ts:83:20)",
-            "    at message (/home/nxank4/personal/yeastbook/packages/app/src/server.ts:524:36)"
-          ]
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": "[\n  [ 1, 2 ], [ 3, 4 ], [ 5, 6 ]\n]"
+          },
+          "metadata": {},
+          "execution_count": 10,
+          "richOutput": {
+            "type": "json",
+            "data": [
+              [
+                1,
+                2
+              ],
+              [
+                3,
+                4
+              ],
+              [
+                5,
+                6
+              ]
+            ]
+          }
         }
       ],
       "executionCount": 10
@@ -210,11 +318,11 @@
           "output_type": "stream",
           "name": "stdout",
           "text": [
-            "10M iterations: 18.36ms\nSum: 49999995000000\n"
+            "10M iterations: 7.96ms\nSum: 49999995000000\n"
           ]
         }
       ],
-      "executionCount": 11
+      "executionCount": 21
     },
     {
       "id": "demo-12-error",
@@ -229,19 +337,145 @@
             "ReferenceError: undefinedVariable is not defined",
             "    at <anonymous> (file:///home/nxank4/personal/yeastbook/packages/app/src/kernel/execute.ts:4:26)",
             "    at anonymous (file:///home/nxank4/personal/yeastbook/packages/app/src/kernel/execute.ts:5:3)",
-            "    at executeCode (/home/nxank4/personal/yeastbook/packages/app/src/kernel/execute.ts:88:7)",
-            "    at message (/home/nxank4/personal/yeastbook/packages/app/src/server.ts:524:36)"
+            "    at executeCode (/home/nxank4/personal/yeastbook/packages/app/src/kernel/execute.ts:85:7)",
+            "    at message (/home/nxank4/personal/yeastbook/packages/app/src/server.ts:730:36)"
           ]
         }
       ],
-      "executionCount": 12
+      "executionCount": 9
     },
     {
       "id": "demo-13-svg",
       "type": "code",
       "source": "({\n  __mime: \"image/svg+xml\",\n  data: `<svg width=\"200\" height=\"100\" xmlns=\"http://www.w3.org/2000/svg\">\n    <rect width=\"200\" height=\"100\" fill=\"#F7F4EF\"/>\n    <circle cx=\"50\" cy=\"50\" r=\"30\" fill=\"#D97706\"/>\n    <text x=\"100\" y=\"55\" font-family=\"Inter\" font-size=\"16\" fill=\"#1A1714\">Yeastbook</text>\n  </svg>`\n})",
       "outputs": [],
+      "executionCount": 25
+    },
+    {
+      "id": "990f0d00-1aeb-4bdd-bb7b-ef068ace53a2",
+      "type": "code",
+      "source": "// Cell 1: Install lodash\r\n%install lodash",
+      "outputs": [],
+      "executionCount": 1
+    },
+    {
+      "id": "f2ca3bfe-6d79-4b3c-9433-d91a4b49111a",
+      "type": "code",
+      "source": "// Cell 2: Verify lodash works + check version\r\nimport _ from \"lodash\"\r\nconst version = (await Bun.file(\"node_modules/lodash/package.json\").json()).version\r\nconsole.log(\"lodash version:\", version)\r\n_.chunk([1,2,3,4,5,6], 2)",
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "lodash version: 4.17.23\n"
+          ]
+        },
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": "[\n  [ 1, 2 ], [ 3, 4 ], [ 5, 6 ]\n]"
+          },
+          "metadata": {},
+          "execution_count": 2,
+          "richOutput": {
+            "type": "json",
+            "data": [
+              [
+                1,
+                2
+              ],
+              [
+                3,
+                4
+              ],
+              [
+                5,
+                6
+              ]
+            ]
+          }
+        }
+      ],
       "executionCount": 2
+    },
+    {
+      "id": "1ba1edcb-1aef-4c07-bdac-89fa7ac4f492",
+      "type": "code",
+      "source": "// Cell 3: Check metadata đã lưu chưa\r\nconst notebook = await Bun.file(\"demo.ybk\").json()\r\nconsole.log(\"Dependencies in .ybk:\")\r\nconsole.log(notebook.metadata.dependencies)\r\n// Expected: { \"lodash\": \"^4.17.21\" }",
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Dependencies in .ybk:\n{\n  lodash: \"^4.17.23\",\n  dayjs: \"^1.11.20\",\n}\n"
+          ]
+        }
+      ],
+      "executionCount": 3
+    },
+    {
+      "id": "29d7966b-135f-48ee-bf24-33848270fbdb",
+      "type": "code",
+      "source": "// Cell 4: Install thêm package\r\n%install dayjs",
+      "outputs": [],
+      "executionCount": 4
+    },
+    {
+      "id": "e04cddf3-92b5-483b-942b-3296294f6144",
+      "type": "code",
+      "source": "// Cell 5: Verify cả hai trong metadata\r\nimport dayjs from \"dayjs\"\r\nconsole.log(\"Today:\", dayjs().format(\"YYYY-MM-DD\"))\r\n\r\nconst nb = await Bun.file(\"demo.ybk\").json()\r\nconsole.log(\"All dependencies:\", nb.metadata.dependencies)\r\n// Expected: { \"lodash\": \"^x.x.x\", \"dayjs\": \"^x.x.x\" }",
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Today: 2026-03-23\nAll dependencies: {\n  lodash: \"^4.17.23\",\n  dayjs: \"^1.11.20\",\n}\n"
+          ]
+        }
+      ],
+      "executionCount": 5
+    },
+    {
+      "id": "4e71fdfa-3f12-41b7-afa5-539f1952d272",
+      "type": "code",
+      "source": "",
+      "outputs": [],
+      "executionCount": null
+    },
+    {
+      "id": "a82aca97-ef88-44fe-a78b-da08a3916c8f",
+      "type": "code",
+      "source": "import dayjs from \"dayjs\"\r\ndayjs().format(\"DD/MM/YYYY\")",
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": "\"23/03/2026\""
+          },
+          "metadata": {},
+          "execution_count": 12,
+          "richOutput": {
+            "type": "text",
+            "text": "23/03/2026"
+          }
+        }
+      ],
+      "executionCount": 12
+    },
+    {
+      "id": "6c20fc36-5af1-4ed3-88d0-b7e052cf91f9",
+      "type": "code",
+      "source": "const result = await $`bun packages/app/src/cli.ts install demo.ybk`.text()\r\nconsole.log(result)",
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "\u001b[36m📦 Installing 2 dependencies...\u001b[0m\nbun add v1.3.11 (af24e281)\n\ninstalled lodash@4.17.23\ninstalled dayjs@1.11.20\n\n[4.00ms] done\n\u001b[32m✓ All dependencies installed\u001b[0m\n\n"
+          ]
+        }
+      ],
+      "executionCount": 13
     }
   ]
 }
