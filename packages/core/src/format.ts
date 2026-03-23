@@ -23,6 +23,7 @@ export interface YbkCellOutput {
   evalue?: string;
   traceback?: string[];
   name?: string;
+  richOutput?: Record<string, unknown>;
 }
 
 export interface YbkNotebook {

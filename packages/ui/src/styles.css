@@ -1030,6 +1030,12 @@ input, textarea, select {
   padding: 4px 0;
 }
 
+.output-rich svg {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
 .json-node {
   display: inline;
 }
