@@ -19,6 +19,6 @@
     "@types/react-dom": "^19.2.3"
   },
   "scripts": {
-    "build": "bun build src/index.tsx --outdir dist --bundle --minify && cp src/index.html dist/index.html"
+    "build": "bun build src/index.tsx --outdir dist --bundle --minify && cp src/index.html dist/index.html && cp src/scrollbar.css dist/scrollbar.css"
   }
 }
