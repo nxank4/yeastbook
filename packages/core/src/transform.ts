@@ -109,9 +109,6 @@ export function transformCellCode(code: string): string {
     const trimmed = line.trimStart();
     const indent = line.substring(0, line.length - trimmed.length);
 
-    if (braceDepth !== 0) {
-      process.stderr?.write?.(`[transform] line ${i} skipped (braceDepth=${braceDepth}): ${trimmed.slice(0, 40)}\n`);
-    }
     if (braceDepth === 0) {
       // Strip top-level export keyword
       if (trimmed.startsWith("export ")) {
@@ -139,7 +136,6 @@ export function transformCellCode(code: string): string {
       const simpleMatch = trimmedAfter.match(/^var\s+(\w+)\s*=\s*(.+)$/);
       if (simpleMatch) {
         line = `${indentAfter}var ${simpleMatch[1]} = globalThis.${simpleMatch[1]} = ${simpleMatch[2]}`;
-        process.stderr?.write?.(`[transform] hoisted: ${simpleMatch[1]}\n`);
       } else {
         // Destructuring: var { a, b } = expr  OR  var [x, y] = expr
         // Known limitation: nested destructuring ({ a: { b } }) is not supported.

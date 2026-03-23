@@ -29,12 +29,6 @@ export async function executeCode(
   let stderr = "";
   const tables: Record<string, unknown>[] = [];
 
-  // Debug: log context state before execution
-  const contextKeys = Object.keys(context);
-  if (contextKeys.length > 0) {
-    process.stderr.write(`[kernel] context before exec: [${contextKeys.join(", ")}]\n`);
-  }
-
   // Inject context into globalThis
   Object.assign(globalThis, context);
 
@@ -82,7 +76,8 @@ export async function executeCode(
   try {
     const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
     const wrapped = transformCellCode(code);
-    process.stderr.write(`[kernel] transformed:\n${wrapped}\n`);
+    const hasGlobalThis = wrapped.includes("globalThis.");
+    process.stderr.write(`[kernel] transformed (globalThis=${hasGlobalThis}):\n${wrapped}\n`);
     // Expose Bun Shell ($) and Bun APIs as named parameters in cell context
     const fn = new AsyncFunction("$", "Bun", "createSlider", "createInput", "createToggle", "createSelect", wrapped);
     const interruptPromise = new Promise<never>((_, reject) => {
@@ -109,10 +104,7 @@ export async function executeCode(
       }
     }
 
-    if (newKeys.length > 0) {
-      process.stderr.write(`[kernel] new vars captured: [${newKeys.join(", ")}]\n`);
-    }
-    process.stderr.write(`[kernel] context after exec: [${Object.keys(context).join(", ")}]\n`);
+    process.stderr.write(`[kernel] context: [${Object.keys(context).join(", ")}]${newKeys.length > 0 ? ` (new: ${newKeys.join(", ")})` : ""}\n`);
 
     return { value, stdout, stderr, tables };
   } catch (err: unknown) {
