@@ -1,0 +1,192 @@
+{
+  "version": "0.1.0",
+  "metadata": {
+    "title": "Linear Regression from Scratch",
+    "created": "2026-03-23T00:00:00.000Z",
+    "runtime": "bun",
+    "bunVersion": "1.3.11"
+  },
+  "settings": {
+    "fontSize": 13,
+    "tabSize": 2,
+    "wordWrap": false,
+    "theme": "light"
+  },
+  "cells": [
+    {
+      "id": "lr-header",
+      "type": "markdown",
+      "source": "# Linear Regression from Scratch\nTraining a linear regression model in pure TypeScript — no libraries needed.\n\nPredicts house prices from: square footage, bedrooms, and age."
+    },
+    {
+      "id": "lr-01-dataset",
+      "type": "code",
+      "source": "// Cell 1: Setup dataset — predict house prices\nconst dataset = {\n  // [size_sqft, bedrooms, age_years] → price_usd\n  X: [\n    [1200, 2, 10], [1500, 3, 5], [900, 1, 20],\n    [2000, 4, 2], [1800, 3, 8], [1100, 2, 15],\n    [2500, 5, 1], [1300, 2, 12], [1600, 3, 6],\n    [800, 1, 25], [2200, 4, 3], [1400, 2, 9],\n  ],\n  y: [\n    250000, 350000, 180000, 480000, 420000, 220000,\n    580000, 270000, 370000, 160000, 510000, 290000,\n  ]\n}\n\nconsole.log(\"Dataset size:\", dataset.X.length, \"samples\")\nconsole.log(\"Features: size_sqft, bedrooms, age_years\")\nconsole.log(\"Target: price_usd\")\ndataset.X.slice(0, 3).map((x, i) => ({\n  features: x,\n  price: dataset.y[i]\n}))",
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Dataset size: 12 samples\nFeatures: size_sqft, bedrooms, age_years\nTarget: price_usd\n"
+          ]
+        }
+      ],
+      "executionCount": 5
+    },
+    {
+      "id": "lr-02-normalize",
+      "type": "code",
+      "source": "// Cell 2: Normalize features (important for gradient descent)\nfunction normalize(X: number[][]): { \n  normalized: number[][], \n  mean: number[], \n  std: number[] \n} {\n  const numFeatures = X[0]!.length\n  const mean = Array(numFeatures).fill(0) as number[]\n  const std = Array(numFeatures).fill(0) as number[]\n  \n  // Compute mean\n  for (const row of X) {\n    for (let j = 0; j < numFeatures; j++) {\n      mean[j]! += row[j]! / X.length\n    }\n  }\n  \n  // Compute std\n  for (const row of X) {\n    for (let j = 0; j < numFeatures; j++) {\n      std[j]! += Math.pow(row[j]! - mean[j]!, 2) / X.length\n    }\n  }\n  for (let j = 0; j < numFeatures; j++) {\n    std[j] = Math.sqrt(std[j]!)\n  }\n  \n  // Normalize\n  const normalized = X.map(row =>\n    row.map((val, j) => (val - mean[j]!) / (std[j]! || 1))\n  )\n  \n  return { normalized, mean, std }\n}\n\nconst { normalized: X_norm, mean, std } = normalize(dataset.X)\nconst y = dataset.y\n\nconsole.log(\"Feature means:\", mean.map(v => v.toFixed(1)))\nconsole.log(\"Feature stds:\", std.map(v => v.toFixed(1)))\nconsole.log(\"Sample normalized:\", X_norm[0]!.map(v => v.toFixed(3)))",
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Feature means: [ \"1525.0\", \"2.7\", \"9.7\" ]\nFeature stds: [ \"498.5\", \"1.2\", \"7.0\" ]\nSample normalized: [ \"-0.652\", \"-0.566\", \"0.047\" ]\n"
+          ]
+        }
+      ],
+      "executionCount": 6
+    },
+    {
+      "id": "lr-03-model",
+      "type": "code",
+      "source": "// Cell 3: Linear Regression model\nclass LinearRegression {\n  weights: number[]\n  bias: number\n  learningRate: number\n  losses: number[]\n  \n  constructor(numFeatures: number, learningRate = 0.01) {\n    this.weights = Array(numFeatures).fill(0).map(() => \n      (Math.random() - 0.5) * 0.01\n    )\n    this.bias = 0\n    this.learningRate = learningRate\n    this.losses = []\n  }\n  \n  predict(X: number[][]): number[] {\n    return X.map(row => \n      row.reduce((sum, val, i) => sum + val * this.weights[i]!, 0) + this.bias\n    )\n  }\n  \n  mse(yTrue: number[], yPred: number[]): number {\n    return yTrue.reduce((sum, y, i) => \n      sum + Math.pow(y - yPred[i]!, 2), 0\n    ) / yTrue.length\n  }\n  \n  train(X: number[][], y: number[], epochs: number): void {\n    const n = X.length\n    \n    for (let epoch = 0; epoch < epochs; epoch++) {\n      const yPred = this.predict(X)\n      \n      const errors = yPred.map((p, i) => p - y[i]!)\n      const dW = this.weights.map((_, j) =>\n        errors.reduce((sum, err, i) => sum + err * X[i]![j]!, 0) / n\n      )\n      const dB = errors.reduce((sum, err) => sum + err, 0) / n\n      \n      this.weights = this.weights.map((w, j) => w - this.learningRate * dW[j]!)\n      this.bias -= this.learningRate * dB\n      \n      if (epoch % 100 === 0) {\n        const loss = this.mse(y, this.predict(X))\n        this.losses.push(loss)\n      }\n    }\n  }\n}\n\nconst model = new LinearRegression(3, learningRate = 0.1)\nconsole.log(\"Model initialized\")\nconsole.log(\"Initial weights:\", model.weights.map(w => w.toFixed(4)))",
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Model initialized\nInitial weights: [ \"-0.0032\", \"-0.0050\", \"-0.0022\" ]\n"
+          ]
+        }
+      ],
+      "executionCount": 7
+    },
+    {
+      "id": "lr-04-train",
+      "type": "code",
+      "source": "// Cell 4: Train the model\nconsole.log(\"Training started...\")\nconst startTime = performance.now()\n\nmodel.train(X_norm, y, epochs = 2000)\n\nconst trainTime = performance.now() - startTime\nconsole.log(`Training done in ${trainTime.toFixed(1)}ms`)\n\nconst lossCurve = model.losses.map((loss, i) => ({\n  epoch: i * 100,\n  loss: Math.round(loss),\n  rmse: Math.round(Math.sqrt(loss))\n}))\n\nconsole.log(\"\\nLoss curve (every 100 epochs):\")\nlossCurve.forEach(l => console.log(`  Epoch ${l.epoch}: RMSE=$${l.rmse.toLocaleString()}`))",
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Training started...\nTraining done in 5.1ms\n\nLoss curve (every 100 epochs):\n  Epoch 0: RMSE=$320,117\n  Epoch 100: RMSE=$13,408\n  Epoch 200: RMSE=$11,686\n  Epoch 300: RMSE=$11,194\n  Epoch 400: RMSE=$10,922\n  Epoch 500: RMSE=$10,743\n  Epoch 600: RMSE=$10,623\n  Epoch 700: RMSE=$10,544\n  Epoch 800: RMSE=$10,491\n  Epoch 900: RMSE=$10,455\n  Epoch 1000: RMSE=$10,432\n  Epoch 1100: RMSE=$10,416\n  Epoch 1200: RMSE=$10,406\n  Epoch 1300: RMSE=$10,399\n  Epoch 1400: RMSE=$10,395\n  Epoch 1500: RMSE=$10,392\n  Epoch 1600: RMSE=$10,390\n  Epoch 1700: RMSE=$10,388\n  Epoch 1800: RMSE=$10,387\n  Epoch 1900: RMSE=$10,387\n"
+          ]
+        }
+      ],
+      "executionCount": 8
+    },
+    {
+      "id": "lr-05-chart",
+      "type": "code",
+      "source": "// Cell 5: Visualize training loss as chart\n;({\n  __type: \"chart\",\n  data: model.losses.map(l => Math.sqrt(l)),\n  config: {\n    chartType: \"line\",\n    label: \"RMSE (USD)\",\n    title: \"Training Loss Over Time\",\n  }\n})",
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": "[\n  320117.0292655496, 13407.839352231284, 11686.469451970255, 11194.459226839523,\n  10921.82835403806, 10743.023465961574, 10623.489747245643, 10543.67757934982, 10490.529249016241,\n  10455.20883078125, 10431.769006917384, 10416.228170505266, 10405.93090789705, 10399.11085438788,\n  10394.595068913379, 10391.60556648173, 10389.626722496845, 10388.31697036813, 10387.45012140099,\n  10386.876424668746\n]"
+          },
+          "metadata": {},
+          "execution_count": 9,
+          "richOutput": {
+            "type": "json",
+            "data": [
+              320117.0292655496,
+              13407.839352231284,
+              11686.469451970255,
+              11194.459226839523,
+              10921.82835403806,
+              10743.023465961574,
+              10623.489747245643,
+              10543.67757934982,
+              10490.529249016241,
+              10455.20883078125,
+              10431.769006917384,
+              10416.228170505266,
+              10405.93090789705,
+              10399.11085438788,
+              10394.595068913379,
+              10391.60556648173,
+              10389.626722496845,
+              10388.31697036813,
+              10387.45012140099,
+              10386.876424668746
+            ]
+          }
+        }
+      ],
+      "executionCount": 9
+    },
+    {
+      "id": "lr-06-evaluate",
+      "type": "code",
+      "source": "// Cell 6: Evaluate on training data\nconst yPred = model.predict(X_norm)\nconst mse = model.mse(y, yPred)\nconst rmse = Math.sqrt(mse)\nconst mae = y.reduce((sum, yi, i) => sum + Math.abs(yi - yPred[i]!), 0) / y.length\n\nconst yMean = y.reduce((a, b) => a + b) / y.length\nconst ssTot = y.reduce((sum, yi) => sum + Math.pow(yi - yMean, 2), 0)\nconst ssRes = y.reduce((sum, yi, i) => sum + Math.pow(yi - yPred[i]!, 2), 0)\nconst r2 = 1 - ssRes / ssTot\n\nconsole.log(\"=== Model Performance ===\")\nconsole.log(`RMSE: $${Math.round(rmse).toLocaleString()}`)\nconsole.log(`MAE:  $${Math.round(mae).toLocaleString()}`)\nconsole.log(`R²:   ${r2.toFixed(4)} (${(r2 * 100).toFixed(1)}% variance explained)`)\nconsole.log(\"\\nModel weights:\", model.weights.map(w => w.toFixed(2)))\nconsole.log(\"Bias:\", model.bias.toFixed(0))",
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "=== Model Performance ===\nRMSE: $10,386\nMAE:  $9,429\nR²:   0.9936 (99.4% variance explained)\n\nModel weights: [ \"105609.49\", \"24549.82\", \"675.38\" ]\nBias: 340000\n"
+          ]
+        }
+      ],
+      "executionCount": 10
+    },
+    {
+      "id": "lr-07-compare",
+      "type": "code",
+      "source": "// Cell 7: Compare predictions vs actual\nconst comparison = dataset.X.map((x, i) => ({\n  features: { sqft: x[0], beds: x[1], age: x[2] },\n  actual: `$${dataset.y[i]!.toLocaleString()}`,\n  predicted: `$${Math.round(yPred[i]!).toLocaleString()}`,\n  error: `${(((yPred[i]! - dataset.y[i]!) / dataset.y[i]!) * 100).toFixed(1)}%`\n}))\ncomparison",
+      "outputs": [],
+      "executionCount": 11
+    },
+    {
+      "id": "lr-08-predict",
+      "type": "code",
+      "source": "// Cell 8: Predict on new houses\nfunction predictPrice(\n  sqft: number,\n  bedrooms: number,\n  ageYears: number\n): number {\n  const input = [[\n    (sqft - mean[0]!) / std[0]!,\n    (bedrooms - mean[1]!) / std[1]!,\n    (ageYears - mean[2]!) / std[2]!,\n  ]]\n  return Math.round(model.predict(input)[0]!)\n}\n\nconst newHouses = [\n  { sqft: 1700, beds: 3, age: 7 },\n  { sqft: 3000, beds: 5, age: 1 },\n  { sqft: 700, beds: 1, age: 30 },\n]\n\nnewHouses.map(h => ({\n  ...h,\n  predictedPrice: `$${predictPrice(h.sqft, h.beds, h.age).toLocaleString()}`\n}))",
+      "outputs": [],
+      "executionCount": 12
+    },
+    {
+      "id": "lr-09-nn-header",
+      "type": "markdown",
+      "source": "## Bonus: Neural Network from Scratch\nA simple 2-layer neural net (3 → 8 → 1) with ReLU activation, trained on the same data."
+    },
+    {
+      "id": "lr-10-nn",
+      "type": "code",
+      "source": "// Cell 9: Neural Network from scratch (2 layers)\nclass NeuralNet {\n  W1: number[][]\n  b1: number[]\n  W2: number[]\n  b2: number\n  losses: number[]\n\n  constructor(inputSize: number, hiddenSize: number) {\n    const scale1 = Math.sqrt(2 / inputSize)\n    const scale2 = Math.sqrt(2 / hiddenSize)\n    \n    this.W1 = Array(hiddenSize).fill(0).map(() =>\n      Array(inputSize).fill(0).map(() => (Math.random() - 0.5) * scale1)\n    )\n    this.b1 = Array(hiddenSize).fill(0)\n    this.W2 = Array(hiddenSize).fill(0).map(() => (Math.random() - 0.5) * scale2)\n    this.b2 = 0\n    this.losses = []\n  }\n\n  relu(x: number): number { return Math.max(0, x) }\n  reluDeriv(x: number): number { return x > 0 ? 1 : 0 }\n\n  forward(x: number[]): { h: number[], out: number } {\n    const h = this.W1.map((w, i) =>\n      this.relu(w.reduce((s, wj, j) => s + wj * x[j]!, 0) + this.b1[i]!)\n    )\n    const out = this.W2.reduce((s, w, i) => s + w * h[i]!, 0) + this.b2\n    return { h, out }\n  }\n\n  train(X: number[][], y: number[], epochs: number, lr = 0.01): void {\n    for (let epoch = 0; epoch < epochs; epoch++) {\n      let totalLoss = 0\n\n      for (let i = 0; i < X.length; i++) {\n        const { h, out } = this.forward(X[i]!)\n        const err = out - y[i]!\n        totalLoss += err * err\n\n        const dOut = err\n        const dW2 = h.map(hi => dOut * hi)\n        const db2 = dOut\n\n        const dH = this.W2.map(w => dOut * w)\n        const dW1 = this.W1.map((w, j) =>\n          w.map((_, k) => dH[j]! * this.reluDeriv(\n            w.reduce((s, wk, kk) => s + wk * X[i]![kk]!, 0) + this.b1[j]!\n          ) * X[i]![k]!)\n        )\n\n        this.W2 = this.W2.map((w, j) => w - lr * dW2[j]!)\n        this.b2 -= lr * db2\n        this.W1 = this.W1.map((w, j) =>\n          w.map((wk, k) => wk - lr * dW1[j]![k]!)\n        )\n        this.b1 = this.b1.map((b, j) =>\n          b - lr * dH[j]! * this.reluDeriv(\n            this.W1[j]!.reduce((s, w, k) => s + w * X[i]![k]!, 0) + b\n          )\n        )\n      }\n\n      if (epoch % 200 === 0) {\n        this.losses.push(totalLoss / X.length)\n      }\n    }\n  }\n}\n\nconst nn = new NeuralNet(3, 8)\nconsole.log(\"Neural net initialized: 3 → 8 → 1\")\nnn.train(X_norm, y.map(v => v / 1e6), 1000, lr = 0.001)\n\nconst nnPred = X_norm.map(x => Math.round(nn.forward(x).out * 1e6))\nconst nnRmse = Math.sqrt(\n  y.reduce((s, yi, i) => s + Math.pow(yi - nnPred[i]!, 2), 0) / y.length\n)\n\nconsole.log(`Neural Net RMSE: $${Math.round(nnRmse).toLocaleString()}`)\nconsole.log(`Linear Model RMSE: $${Math.round(Math.sqrt(model.mse(y, yPred))).toLocaleString()}`)",
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Neural net initialized: 3 → 8 → 1\nNeural Net RMSE: $27,721\nLinear Model RMSE: $10,386\n"
+          ]
+        }
+      ],
+      "executionCount": 13
+    },
+    {
+      "id": "lr-11-chart",
+      "type": "code",
+      "source": "// Cell 10: Model comparison chart\n;({\n  __type: \"chart\",\n  data: [Math.sqrt(model.mse(y, yPred)), Math.sqrt(\n    y.reduce((s, yi, i) => s + Math.pow(yi - X_norm.map(x =>\n      Math.round(nn.forward(x).out * 1e6))[i]!, 2), 0) / y.length\n  )],\n  config: {\n    chartType: \"bar\",\n    label: \"RMSE (USD)\",\n    title: \"Linear Regression vs Neural Network\",\n  }\n})",
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": "27721.205840475264"
+          },
+          "metadata": {},
+          "execution_count": 14,
+          "richOutput": {
+            "type": "text",
+            "text": "27721.205840475264"
+          }
+        }
+      ],
+      "executionCount": 14
+    }
+  ]
+}
