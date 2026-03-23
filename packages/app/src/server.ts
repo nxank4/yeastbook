@@ -318,6 +318,9 @@ export async function startServer(filePath: string, port: number = 3000, devMode
       "/api/notebook": {
         GET: () => Response.json({ ...state.notebook.toJSON(), filePath: state.filePath, fileName: basename(state.filePath), fileFormat: state.notebook.format }),
       },
+      "/api/notebook/path": {
+        GET: () => Response.json({ path: state.filePath }),
+      },
       "/api/cells": {
         POST: async (req) => {
           const body = await req.json() as { type: "code" | "markdown"; source?: string };

@@ -29,11 +29,17 @@ export async function executeCode(
   let stderr = "";
   const tables: Record<string, unknown>[] = [];
 
-  // Snapshot globalThis keys before execution
-  const keysBefore = new Set(Object.keys(globalThis));
+  // Debug: log context state before execution
+  const contextKeys = Object.keys(context);
+  if (contextKeys.length > 0) {
+    process.stderr.write(`[kernel] context before exec: [${contextKeys.join(", ")}]\n`);
+  }
 
   // Inject context into globalThis
   Object.assign(globalThis, context);
+
+  // Snapshot globalThis keys AFTER injection so we can detect truly new keys
+  const keysBefore = new Set(Object.keys(globalThis));
 
   // Override process.exit/abort to prevent user code from killing the server
   const origExit = process.exit;
@@ -76,6 +82,7 @@ export async function executeCode(
   try {
     const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
     const wrapped = transformCellCode(code);
+    process.stderr.write(`[kernel] transformed:\n${wrapped}\n`);
     // Expose Bun Shell ($) and Bun APIs as named parameters in cell context
     const fn = new AsyncFunction("$", "Bun", "createSlider", "createInput", "createToggle", "createSelect", wrapped);
     const interruptPromise = new Promise<never>((_, reject) => {
@@ -88,9 +95,11 @@ export async function executeCode(
     interruptReject = null;
 
     // Capture new globalThis keys into context
+    const newKeys: string[] = [];
     for (const key of Object.keys(globalThis)) {
       if (!keysBefore.has(key)) {
         context[key] = (globalThis as Record<string, unknown>)[key];
+        newKeys.push(key);
       }
     }
     // Also sync existing context keys that may have been reassigned
@@ -99,6 +108,11 @@ export async function executeCode(
         context[key] = (globalThis as Record<string, unknown>)[key];
       }
     }
+
+    if (newKeys.length > 0) {
+      process.stderr.write(`[kernel] new vars captured: [${newKeys.join(", ")}]\n`);
+    }
+    process.stderr.write(`[kernel] context after exec: [${Object.keys(context).join(", ")}]\n`);
 
     return { value, stdout, stderr, tables };
   } catch (err: unknown) {
