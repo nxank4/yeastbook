@@ -1123,7 +1123,7 @@ input, textarea, select {
 
 /* --- Toast --- */
 .toast {
-  position: fixed; top: 12px; right: 16px;
+  position: fixed; bottom: 48px; right: 16px;
   background: var(--bg-surface); color: var(--text-secondary);
   border: 1px solid var(--border-subtle);
   padding: 6px 14px; border-radius: 8px;
