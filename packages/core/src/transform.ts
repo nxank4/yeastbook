@@ -118,6 +118,7 @@ export function transformCellCode(code: string): string {
   const lines = code.split("\n");
   const transformed: string[] = [];
   let braceDepth = 0;
+  let pendingFuncHoist: string | null = null;
 
   // Single pass: convert const/let → var and hoist to globalThis (top-level only)
   // Note: brace depth tracking is a simple character counter that doesn't account for
@@ -167,6 +168,12 @@ export function transformCellCode(code: string): string {
           line = `${indentAfter}var ${pattern} = ${expr}; ${assignments}`;
         }
       }
+
+      // Mark top-level function declarations for globalThis hoisting
+      const funcMatch = trimmed2.match(/^function\s+([a-zA-Z_$]\w*)\s*\(/);
+      if (funcMatch) {
+        pendingFuncHoist = funcMatch[1]!;
+      }
     }
 
     transformed.push(line);
@@ -176,6 +183,12 @@ export function transformCellCode(code: string): string {
     for (const ch of codeOnly) {
       if (ch === "{") braceDepth++;
       else if (ch === "}") braceDepth = Math.max(0, braceDepth - 1);
+    }
+
+    // When a function body closes, hoist it to globalThis
+    if (pendingFuncHoist && braceDepth === 0) {
+      transformed.push(`globalThis.${pendingFuncHoist} = ${pendingFuncHoist};`);
+      pendingFuncHoist = null;
     }
   }
 
