@@ -837,13 +837,6 @@ input, textarea, select {
 .output-stderr { color: var(--status-error); }
 .output-result { color: var(--result); font-style: italic; }
 
-.output-error {
-  background: var(--error-bg);
-  border-left: 3px solid var(--status-error);
-  border-radius: 6px;
-  padding: 8px 12px;
-}
-
 .output-error .error-header {
   color: var(--status-error);
   font-weight: 600;
@@ -852,11 +845,9 @@ input, textarea, select {
 .output-error .traceback {
   font-size: 12px;
   color: var(--error-trace);
-  margin-top: 6px;
+  margin-top: 4px;
   white-space: pre-wrap;
   line-height: 1.5;
-  border-top: 1px solid var(--error-border);
-  padding-top: 6px;
 }
 
 /* --- Markdown --- */

@@ -353,24 +353,6 @@ export function CodeCell({
           <button onClick={() => setAiPromptOpen(false)} className="ai-cancel-btn">Cancel</button>
         </div>
       )}
-      {installing && (
-        <div className="output-section">
-          <div className="output-area">
-            {!installing.done && (
-              <div className="output-stdout"><span className="busy-indicator" /> Installing {installing.packages.join(", ")}...</div>
-            )}
-            {installing.logs.length > 0 && (
-              <div className="output-stdout">{installing.logs.join("")}</div>
-            )}
-            {installing.done && !installing.error && (
-              <div className="output-stdout">Installed {installing.packages.join(", ")}</div>
-            )}
-            {installing.done && installing.error && (
-              <div className="output-stderr">Install failed: {installing.error}</div>
-            )}
-          </div>
-        </div>
-      )}
       <div className="code-area">
         <Editor
           height={editorHeight}
@@ -401,11 +383,27 @@ export function CodeCell({
           }}
         />
       </div>
-      {displayOutputs.length > 0 && (
+      {(displayOutputs.length > 0 || installing) && (
         <div className="output-section">
           <div className="output-actions">
             <button onClick={(e) => { e.stopPropagation(); onClear(cell.id); }} title="Clear output"><i className="bi bi-eraser" /></button>
           </div>
+          {installing && (
+            <div className="output-area">
+              {!installing.done && (
+                <div className="output-stdout"><span className="busy-indicator" /> Installing {installing.packages.join(", ")}...</div>
+              )}
+              {installing.logs.length > 0 && (
+                <div className="output-stdout">{installing.logs.join("")}</div>
+              )}
+              {installing.done && !installing.error && (
+                <div className="output-stdout">Installed {installing.packages.join(", ")}</div>
+              )}
+              {installing.done && installing.error && (
+                <div className="output-stderr">Install failed: {installing.error}</div>
+              )}
+            </div>
+          )}
           <CellOutput outputs={displayOutputs} />
         </div>
       )}
