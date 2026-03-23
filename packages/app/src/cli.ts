@@ -9,6 +9,7 @@ import { startServer } from "./server.ts";
 import { listNotebooks } from "./dashboard.ts";
 import { loadNotebook, saveNotebook, ybkToIpynb, ipynbToYbk, createEmptyYbk } from "@yeastbook/core";
 import type { IpynbNotebook } from "@yeastbook/core";
+import { diffNotebook, diffText } from "./diff.ts";
 
 // ---------------------------------------------------------------------------
 // Flag parsing
@@ -80,6 +81,9 @@ function printUsage(): void {
   console.log("  yeastbook plugin list                               List installed plugins");
   console.log("  yeastbook plugin install <pkg>                      Install a plugin");
   console.log("  yeastbook plugin remove <name>                      Remove a plugin");
+  console.log("  yeastbook diff <file> [--staged] [--commit <ref>]   Show notebook diff");
+  console.log("  yeastbook diff <old.ybk> <new.ybk>                  Diff two notebooks");
+  console.log("  yeastbook diff-text <file>                           Dump notebook as readable text");
   console.log("");
   console.log("Options:");
   console.log("  --port <n>    Port to listen on (default: $PORT or 3000)");
@@ -337,6 +341,27 @@ if (!command || command === "new") {
   process.exit(0);
 } else if (command === "plugin") {
   await handlePlugin(positional.slice(1));
+} else if (command === "diff") {
+  const args = process.argv.slice(3);
+  const filePath = args.find((a) => !a.startsWith("--"));
+  if (!filePath) {
+    console.error("Usage: yeastbook diff <file.ybk> [--staged] [--commit <ref>] [other.ybk]");
+    process.exit(1);
+  }
+  const staged = args.includes("--staged");
+  const commitIdx = args.indexOf("--commit");
+  const commit = commitIdx !== -1 ? args[commitIdx + 1] : undefined;
+  const otherFile = args.find((a) => !a.startsWith("--") && a !== filePath);
+  await diffNotebook(filePath, { staged, commit, otherFile });
+  process.exit(0);
+} else if (command === "diff-text") {
+  const filePath = positional[1];
+  if (!filePath) {
+    console.error("Usage: yeastbook diff-text <file.ybk>");
+    process.exit(1);
+  }
+  await diffText(resolve(filePath));
+  process.exit(0);
 } else {
   // Open existing notebook by path
   await checkWritePermission();
