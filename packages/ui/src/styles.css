@@ -827,6 +827,12 @@ input, textarea, select {
 }
 .output-actions button:hover { background: var(--bg-app); color: var(--text-secondary); }
 
+.output-stdout, .output-stderr, .output-result, .output-error {
+  user-select: text;
+  cursor: text;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
 .output-stdout { color: var(--text-primary); }
 .output-stderr { color: var(--status-error); }
 .output-result { color: var(--result); font-style: italic; }

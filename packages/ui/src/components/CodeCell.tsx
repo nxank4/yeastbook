@@ -274,6 +274,13 @@ export function CodeCell({
     });
   }, [ctxMenu]);
 
+  const copyInputAndOutput = useCallback(() => {
+    const input = sourceRef.current;
+    const output = displayOutputs.map((o: any) => o.text?.join?.("") || o.data?.["text/plain"] || o.evalue || "").filter(Boolean).join("\n");
+    const combined = output ? `${input}\n\n--- Output ---\n${output}` : input;
+    navigator.clipboard.writeText(combined);
+  }, [displayOutputs]);
+
   const buildCtxItems = useCallback((): ContextMenuItem[] => {
     if (ctxMenu?.zone === "output") {
       return [
@@ -281,6 +288,7 @@ export function CodeCell({
           const text = displayOutputs.map((o: any) => o.text?.join?.("") || o.data?.["text/plain"] || "").join("\n");
           navigator.clipboard.writeText(text);
         }},
+        { id: "copy-both", label: "Copy Input + Output", icon: "bi bi-clipboard2-plus", onClick: copyInputAndOutput },
         { id: "clear-output", label: "Clear Output", icon: "bi bi-eraser", onClick: () => onClear(cell.id) },
         { id: "sep1", label: "", separator: true },
         { id: "native", label: "Show Native Menu", icon: "bi bi-window", onClick: showNativeMenu },
@@ -292,6 +300,7 @@ export function CodeCell({
       { id: "sep1", label: "", separator: true },
       { id: "cut", label: "Cut Cell", icon: "bi bi-scissors", onClick: onCut },
       { id: "copy", label: "Copy Cell", icon: "bi bi-clipboard", onClick: onCopy },
+      { id: "copy-both", label: "Copy Input + Output", icon: "bi bi-clipboard2-plus", onClick: copyInputAndOutput },
       { id: "paste", label: "Paste Cell Below", icon: "bi bi-clipboard-check", onClick: onPasteBelow, disabled: !hasClipboard },
       { id: "sep2", label: "", separator: true },
       { id: "move-up", label: "Move Up", icon: "bi bi-arrow-up", onClick: onMoveUp, disabled: !onMoveUp },
