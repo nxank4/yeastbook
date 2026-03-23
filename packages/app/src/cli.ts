@@ -311,6 +311,30 @@ if (!command || command === "new") {
   const destPath = join(dirname(srcPath), basename(srcPath, ".ipynb") + ".ybk");
   await Bun.write(destPath, JSON.stringify(ybk, null, 2) + "\n");
   console.log(`Imported: ${srcPath} → ${destPath}`);
+} else if (command === "install") {
+  const srcPath = resolve(positional[1] ?? "");
+  if (!srcPath) {
+    console.error("Usage: yeastbook install <file.ybk>");
+    process.exit(1);
+  }
+  const { notebook } = await loadNotebook(srcPath);
+  const deps = notebook.metadata.dependencies ?? {};
+  const entries = Object.entries(deps);
+  if (entries.length === 0) {
+    console.log("No dependencies found in notebook.");
+    process.exit(0);
+  }
+  console.log(`\x1b[36m📦 Installing ${entries.length} dependencies...\x1b[0m`);
+  const pkgs = entries.map(([pkg, ver]) => `${pkg}@${ver}`);
+  const proc = Bun.spawn(["bun", "add", ...pkgs], { stdout: "inherit", stderr: "inherit" });
+  const code = await proc.exited;
+  if (code === 0) {
+    console.log(`\x1b[32m✓ All dependencies installed\x1b[0m`);
+  } else {
+    console.error(`\x1b[31m✗ Install failed (exit code ${code})\x1b[0m`);
+    process.exit(1);
+  }
+  process.exit(0);
 } else if (command === "plugin") {
   await handlePlugin(positional.slice(1));
 } else {

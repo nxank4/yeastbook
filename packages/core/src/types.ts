@@ -89,4 +89,5 @@ export type WsIncoming =
   | { type: "install_error"; cellId: string; error: string }
   | { type: "notebook_updated" }
   | { type: "auto_saved" }
-  | { type: "files_changed" };
+  | { type: "files_changed" }
+  | { type: "dependencies_updated"; dependencies: Record<string, string> };

@@ -6,6 +6,7 @@ import { MenuBar, ShortcutsModal, AboutModal } from "./components/MenuBar.tsx";
 import { StatusBar } from "./components/StatusBar.tsx";
 import { CommandPalette } from "./components/CommandPalette.tsx";
 import { EnvExplorer } from "./components/EnvExplorer.tsx";
+import { DependenciesPanel } from "./components/DependenciesPanel.tsx";
 import { FileExplorer } from "./components/FileExplorer.tsx";
 import { useWebSocket } from "./useWebSocket.ts";
 import { useKeyboardShortcuts, type Mode } from "./hooks/useKeyboardShortcuts.ts";
@@ -31,6 +32,7 @@ export function App() {
   const [version, setVersion] = useState("");
   const [bunVersion, setBunVersion] = useState("");
   const [fileFormat, setFileFormat] = useState<"ybk" | "ipynb">("ybk");
+  const [dependencies, setDependencies] = useState<Record<string, string>>({});
   const [runningAll, setRunningAll] = useState(false);
   const [focusedCellId, setFocusedCellId] = useState<string | null>(null);
   const [clipboardCell, setClipboardCell] = useState<Cell | null>(null);
@@ -282,6 +284,9 @@ export function App() {
       case "files_changed":
         setFileTreeVersion((v) => v + 1);
         break;
+      case "dependencies_updated":
+        setDependencies(msg.dependencies);
+        break;
     }
   }, [showToast]);
 
@@ -296,6 +301,7 @@ export function App() {
 
   useEffect(() => {
     fetch("/api/notebook").then((res) => res.json()).then(loadNotebookData);
+    fetch("/api/dependencies").then((r) => r.json()).then((d) => setDependencies(d.dependencies || {})).catch(() => {});
   }, [loadNotebookData]);
 
   // --- Cell operations ---
@@ -1027,6 +1033,7 @@ export function App() {
       {settings.layout?.sidebar && !isPresenting && (
         <div className="notebook-sidebar">
           <EnvExplorer />
+          <DependenciesPanel dependencies={dependencies} />
         </div>
       )}
       </div>

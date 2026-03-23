@@ -33,6 +33,7 @@ export interface YbkNotebook {
     created: string;
     runtime: string;
     bunVersion: string;
+    dependencies?: Record<string, string>;
   };
   settings: {
     fontSize: number;

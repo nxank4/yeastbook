@@ -150,6 +150,25 @@ export async function startServer(filePath: string, port: number = 3000, devMode
     pluginLoader.registerPlugin((await import("./plugins/builtin/vega.ts")).default);
   } catch {}
 
+  // Auto-install missing dependencies from notebook metadata
+  const deps = notebook.ybk.metadata.dependencies ?? {};
+  if (Object.keys(deps).length > 0) {
+    const missing: string[] = [];
+    for (const [pkg, version] of Object.entries(deps)) {
+      try {
+        await Bun.file(resolve("node_modules", pkg, "package.json")).json();
+      } catch {
+        missing.push(`${pkg}@${version}`);
+      }
+    }
+    if (missing.length > 0) {
+      console.log(`\x1b[36m📦 Installing ${missing.length} missing dependencies...\x1b[0m`);
+      const proc = Bun.spawn(["bun", "add", ...missing], { stdout: "inherit", stderr: "inherit" });
+      await proc.exited;
+      console.log(`\x1b[32m✓ Dependencies ready\x1b[0m`);
+    }
+  }
+
   // Load .env from notebook directory into process.env
   let envKeys: string[] = [];
   async function reloadEnv() {
@@ -478,6 +497,9 @@ export async function startServer(filePath: string, port: number = 3000, devMode
           return Response.json({ keys: envKeys });
         },
       },
+      "/api/dependencies": {
+        GET: () => Response.json({ dependencies: state.notebook.ybk.metadata.dependencies ?? {} }),
+      },
       "/api/types/bun": {
         GET: async () => {
           try {
@@ -640,6 +662,24 @@ export async function startServer(filePath: string, port: number = 3000, devMode
                 });
 
                 if (result.success) {
+                  // Save installed versions to notebook metadata
+                  if (result.versions && Object.keys(result.versions).length > 0) {
+                    if (!state.notebook.ybk.metadata.dependencies) {
+                      state.notebook.ybk.metadata.dependencies = {};
+                    }
+                    for (const [pkg, ver] of Object.entries(result.versions)) {
+                      state.notebook.ybk.metadata.dependencies[pkg] = `^${ver}`;
+                    }
+                    await state.notebook.save(state.filePath);
+                    // Notify clients of updated dependencies
+                    for (const client of clients) {
+                      client.send(JSON.stringify({
+                        type: "dependencies_updated",
+                        dependencies: state.notebook.ybk.metadata.dependencies,
+                      }));
+                    }
+                  }
+
                   // Try to read type definitions for installed packages
                   const packageDts: Record<string, string> = {};
                   for (const pkg of cmd.packages) {

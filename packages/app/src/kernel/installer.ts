@@ -1,8 +1,11 @@
 // src/kernel/installer.ts — Run bun add with streaming output
 
+import { resolve } from "node:path";
+
 export interface InstallResult {
   success: boolean;
   error?: string;
+  versions?: Record<string, string>;
 }
 
 export async function installPackages(
@@ -64,7 +67,15 @@ export async function installPackages(
           await typesProc.exited;
         } catch {}
       }
-      return { success: true };
+      // Read installed versions from node_modules
+      const versions: Record<string, string> = {};
+      for (const pkg of packages) {
+        try {
+          const pkgJson = await Bun.file(resolve("node_modules", pkg, "package.json")).json();
+          if (pkgJson.version) versions[pkg] = pkgJson.version;
+        } catch {}
+      }
+      return { success: true, versions };
     }
 
     return { success: false, error: `bun add exited with code ${exitCode}` };
