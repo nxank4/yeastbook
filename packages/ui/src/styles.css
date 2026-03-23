@@ -129,6 +129,13 @@ input, textarea, select {
 
 /* Scrollbar styles in scrollbar.css (loaded via HTML <link>) to avoid Bun bundler stripping */
 
+/* --- Monaco widget z-index overrides --- */
+.monaco-editor .monaco-hover,
+.monaco-editor .suggest-widget,
+.monaco-editor .parameter-hints-widget,
+.monaco-editor .overflowingContentWidgets { z-index: var(--z-context-menu) !important; }
+.monaco-editor .overflow-guard { z-index: auto; }
+
 .code-area textarea::placeholder {
   color: var(--text-muted);
   -webkit-text-fill-color: var(--text-muted);

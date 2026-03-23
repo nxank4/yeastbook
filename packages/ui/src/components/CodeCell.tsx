@@ -414,6 +414,7 @@ export function CodeCell({
             domReadOnly: isPresenting,
             dragAndDrop: false,
             contextmenu: false,
+            fixedOverflowWidgets: true,
           }}
         />
       </div>
