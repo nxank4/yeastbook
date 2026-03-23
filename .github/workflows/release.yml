@@ -1,0 +1,166 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      - name: Type check
+        run: bunx tsc --noEmit
+
+      - name: Run tests
+        run: bun test
+
+  build-ui:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      - name: Build UI and embed assets
+        run: bun run build:ui && bun run build:embed
+
+      - name: Upload embedded assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: embedded-assets
+          path: packages/app/src/assets.ts
+          retention-days: 1
+
+  build-binaries:
+    needs: build-ui
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: bun-linux-x64
+            name: yeastbook-linux
+          - os: ubuntu-latest
+            target: bun-linux-arm64
+            name: yeastbook-linux-arm64
+          - os: macos-latest
+            target: bun-darwin-arm64
+            name: yeastbook-macos-arm
+          - os: macos-latest
+            target: bun-darwin-x64
+            name: yeastbook-macos-x64
+          - os: windows-latest
+            target: bun-windows-x64
+            name: yeastbook-windows.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      - name: Download embedded assets
+        uses: actions/download-artifact@v4
+        with:
+          name: embedded-assets
+          path: packages/app/src
+
+      - name: Compile binary
+        run: bun build --compile --target=${{ matrix.target }} packages/app/src/cli.ts --outfile binaries/${{ matrix.name }}
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.name }}
+          path: binaries/${{ matrix.name }}
+          retention-days: 1
+
+  build-vsix:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Build and package VS Code extension
+        run: cd packages/vscode && bun install && bun run build && bun run package
+
+      - name: Upload VSIX
+        uses: actions/upload-artifact@v4
+        with:
+          name: yeastbook-vscode
+          path: packages/vscode/*.vsix
+          retention-days: 1
+
+  release:
+    needs: [build-binaries, build-vsix]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all binaries
+        uses: actions/download-artifact@v4
+        with:
+          pattern: binary-*
+          merge-multiple: true
+          path: binaries
+
+      - name: Download VSIX
+        uses: actions/download-artifact@v4
+        with:
+          name: yeastbook-vscode
+          path: vsix
+
+      - name: Prepare release assets
+        run: |
+          chmod +x binaries/yeastbook-linux
+          chmod +x binaries/yeastbook-linux-arm64
+          chmod +x binaries/yeastbook-macos-arm
+          chmod +x binaries/yeastbook-macos-x64
+          cd binaries && sha256sum * > checksums.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          body: |
+            ## Install
+
+            ```bash
+            curl -fsSL https://raw.githubusercontent.com/nxank4/yeastbook/main/install.sh | bash
+            ```
+
+            Or download a binary below for your platform.
+
+            See `checksums.txt` to verify your download.
+
+            ### VS Code Extension
+            Download the `.vsix` file and install via `code --install-extension yeastbook-*.vsix`
+          files: |
+            binaries/yeastbook-linux
+            binaries/yeastbook-linux-arm64
+            binaries/yeastbook-macos-arm
+            binaries/yeastbook-macos-x64
+            binaries/yeastbook-windows.exe
+            binaries/checksums.txt
+            vsix/*.vsix

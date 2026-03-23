@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [main, staging]
+  pull_request:
+    branches: [main, staging]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      - name: Type check
+        run: bunx tsc --noEmit
+
+      - name: Run tests
+        run: bun test
+
+      - name: Build UI
+        run: bun run build:ui
+
+      - name: Embed assets
+        run: bun run build:embed
+
+      - name: Verify binary compiles
+        run: bun build --compile --target=bun-linux-x64 packages/app/src/cli.ts --outfile /tmp/yeastbook-test
