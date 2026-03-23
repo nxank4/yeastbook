@@ -41,3 +41,6 @@ binaries/
 
 # Auto-generated notebooks
 notebook-*.ybk
+
+# VS Code extension packages
+*.vsix
