@@ -304,6 +304,8 @@ export async function startServer(filePath: string, port: number = 3000, devMode
       return new Response("Not found", { status: 404 });
     },
     routes: {
+      "/.well-known/appspecific/com.chrome.devtools.json": () =>
+        new Response("{}", { headers: { "Content-Type": "application/json" } }),
       "/": async () => {
         if ((devMode || hasDistDir())) {
           return new Response(Bun.file(resolve(distDir, "index.html")), {

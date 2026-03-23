@@ -78,26 +78,27 @@ export function CodeCell({
   }, []);
 
   const handleBeforeMount: BeforeMount = useCallback((monaco) => {
-    // Disable TS/JS semantic validation to prevent "Could not find source file: inmemory://model/N"
-    // The TS worker tries to resolve all models cross-editor, which fails with multiple editors
     const diagOpts = {
-      noSemanticValidation: true,
+      noSemanticValidation: false,
       noSyntaxValidation: false,
       noSuggestionDiagnostics: true,
+      diagnosticCodesToIgnore: [2307, 2304, 1378, 2580, 7044],
     };
     monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions(diagOpts);
     monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions(diagOpts);
 
     const compilerOpts = {
       target: monaco.languages.typescript.ScriptTarget.ESNext,
+      module: monaco.languages.typescript.ModuleKind.ESNext,
       moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
       allowSyntheticDefaultImports: true,
       esModuleInterop: true,
+      allowNonTsExtensions: true,
+      noEmit: true,
     };
     monaco.languages.typescript.typescriptDefaults.setCompilerOptions(compilerOpts);
     monaco.languages.typescript.javascriptDefaults.setCompilerOptions(compilerOpts);
 
-    // Disable eager model sync — prevents the worker from scanning all inmemory models
     monaco.languages.typescript.typescriptDefaults.setEagerModelSync(false);
     monaco.languages.typescript.javascriptDefaults.setEagerModelSync(false);
   }, []);
@@ -214,6 +215,18 @@ export function CodeCell({
   }, [cell.id, onSourceChange, updateHeight]);
 
   useEffect(() => { updateHeight(); }, [updateHeight]);
+
+  // Dispose Monaco model when cell unmounts to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      const monaco = monacoRef.current;
+      if (monaco) {
+        const modelUri = monaco.Uri.parse(`file:///cell-${cell.id}.ts`);
+        const model = monaco.editor.getModel(modelUri);
+        model?.dispose();
+      }
+    };
+  }, [cell.id]);
 
 
   const handleAiGenerate = useCallback(async () => {
@@ -377,6 +390,7 @@ export function CodeCell({
           height={editorHeight}
           defaultLanguage="typescript"
           defaultValue={cell.source.join("\n") || ""}
+          path={`cell-${cell.id}.ts`}
           theme="vs-dark"
           beforeMount={handleBeforeMount}
           onMount={handleEditorMount}
@@ -400,8 +414,6 @@ export function CodeCell({
             domReadOnly: isPresenting,
             dragAndDrop: false,
             contextmenu: false,
-            hover: { enabled: false },
-            occurrencesHighlight: "off",
           }}
         />
       </div>
