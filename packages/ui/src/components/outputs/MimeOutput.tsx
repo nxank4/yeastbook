@@ -10,7 +10,7 @@ interface Props {
 export function MimeOutput({ mime, data, url }: Props) {
   // SVG content is sanitized by DOMPurify to prevent XSS
   const sanitizedSvg = useMemo(
-    () => (mime === "image/svg+xml" && data ? DOMPurify.sanitize(data) : ""),
+    () => (mime === "image/svg+xml" && data ? DOMPurify.sanitize(data, { USE_PROFILES: { svg: true, svgFilters: true } }) : ""),
     [mime, data],
   );
 
