@@ -390,10 +390,23 @@ export function App() {
     setSaved(true);
   }, []);
 
+  const sourceChangeTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const handleSourceChange = useCallback((cellId: string, source: string) => {
     setCells((prev) =>
       prev.map((c) => (c.id === cellId ? { ...c, source: [source] } : c))
     );
+    setSaved(false);
+    // Debounce server save — 500ms after last keystroke
+    const existing = sourceChangeTimers.current.get(cellId);
+    if (existing) clearTimeout(existing);
+    sourceChangeTimers.current.set(cellId, setTimeout(() => {
+      sourceChangeTimers.current.delete(cellId);
+      fetch(`/api/cells/${cellId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source }),
+      });
+    }, 500));
   }, []);
 
   const handleAddCell = useCallback(async (type: "code" | "markdown") => {
