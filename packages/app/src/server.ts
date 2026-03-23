@@ -135,6 +135,8 @@ function hasDistDir(): boolean {
 
 export async function startServer(filePath: string, port: number = 3000, devMode: boolean = false) {
   const absPath = resolve(filePath);
+  const notebookDir = dirname(absPath);
+  process.chdir(notebookDir);
   const notebook = await Notebook.load(absPath);
 
   // Track this notebook as recently opened
@@ -251,7 +253,7 @@ export async function startServer(filePath: string, port: number = 3000, devMode
   // File explorer watcher: broadcast files_changed to all clients
   let filesDebounce: ReturnType<typeof setTimeout> | null = null;
   try {
-    fsWatch(process.cwd(), { recursive: true }, (_event, filename) => {
+    const filesWatcher = fsWatch(process.cwd(), { recursive: true }, (_event, filename) => {
       if (typeof filename === "string") {
         const parts = filename.split("/");
         if (parts.some((p) => p === "node_modules" || p === ".git" || p.startsWith(".yeastbook-"))) return;
@@ -263,6 +265,7 @@ export async function startServer(filePath: string, port: number = 3000, devMode
         }
       }, 500);
     });
+    filesWatcher.on("error", () => {}); // ignore watcher errors (e.g. permission denied)
   } catch {}
 
   const CONTENT_TYPES: Record<string, string> = {
