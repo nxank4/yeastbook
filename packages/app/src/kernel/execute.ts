@@ -1,7 +1,28 @@
 // src/kernel/execute.ts
 
 import { $ } from "bun";
+import { Transpiler } from "bun";
 import { transformCellCode, createSlider, createInput, createToggle, createSelect } from "@yeastbook/core";
+
+const transpiler = new Transpiler({
+  loader: "ts",
+  target: "bun",
+});
+
+/**
+ * Transpile TypeScript to JavaScript, wrapping in a function to prevent
+ * Bun's dead-code elimination from stripping expression statements.
+ */
+function transpileTS(code: string): string {
+  // Wrap in async function to prevent DCE of expression statements
+  const wrapped = `async function __yb_cell__() {\n${code}\n}`;
+  const result = transpiler.transformSync(wrapped);
+  // Extract function body (between first { and last })
+  const start = result.indexOf("{") + 1;
+  const end = result.lastIndexOf("}");
+  if (start <= 0 || end <= start) return code;
+  return result.slice(start, end).trim();
+}
 
 // Interrupt mechanism — allows cancelling execution between async yields
 let interruptReject: ((err: Error) => void) | null = null;
@@ -110,8 +131,17 @@ export async function executeCode(
   };
 
   try {
+    // Transpile TypeScript → JavaScript before transform
+    let jsCode: string;
+    try {
+      jsCode = transpileTS(code);
+    } catch {
+      // Transpile failed — try running as-is (may be plain JS)
+      jsCode = code;
+    }
+
     const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
-    let wrapped = transformCellCode(code);
+    let wrapped = transformCellCode(jsCode);
 
     // Safety net: ensure globalThis hoisting even if transform didn't do it
     wrapped = ensureGlobalThisHoisting(wrapped);

@@ -776,6 +776,30 @@ export async function startServer(filePath: string, port: number = 3000, devMode
                     type: "install_error", cellId: msg.cellId, error: result.error,
                   }));
                 }
+              } else if (cmd.type === "timeit") {
+                const runs = cmd.runs;
+                const timeitCode = cmd.code;
+                const times: number[] = [];
+                for (let i = 0; i < runs; i++) {
+                  const start = performance.now();
+                  await executeCode(timeitCode, state.context);
+                  times.push(performance.now() - start);
+                }
+                const avg = times.reduce((a, b) => a + b, 0) / times.length;
+                const min = Math.min(...times);
+                const max = Math.max(...times);
+                ws.send(JSON.stringify({
+                  type: "stream", cellId: msg.cellId, name: "stdout",
+                  text: `${runs} runs: avg ${avg.toFixed(2)}ms, min ${min.toFixed(2)}ms, max ${max.toFixed(2)}ms\n`,
+                }));
+              } else if (cmd.type === "time") {
+                const start = performance.now();
+                await executeCode(cmd.code, state.context);
+                const elapsed = performance.now() - start;
+                ws.send(JSON.stringify({
+                  type: "stream", cellId: msg.cellId, name: "stdout",
+                  text: `Wall time: ${elapsed.toFixed(2)}ms\n`,
+                }));
               } else if (cmd.type === "reload") {
                 for (const mod of cmd.modules) {
                   try {

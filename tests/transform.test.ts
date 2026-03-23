@@ -1,5 +1,6 @@
 import { test, expect, describe } from "bun:test";
 import { transformCellCode, transformImports } from "../packages/core/src/transform.ts";
+import { executeCode } from "../packages/app/src/kernel/execute.ts";
 
 describe("transformCellCode", () => {
   test("converts top-level const to var", () => {
@@ -187,5 +188,56 @@ describe("transformImports", () => {
   test("import with semicolons", () => {
     expect(transformImports('import _ from "lodash";'))
       .toBe('const _ = (await import("lodash")).default');
+  });
+});
+
+describe("TypeScript transpilation", () => {
+  test("TypeScript function with type annotations executes", async () => {
+    const result = await executeCode(`
+      function add(a: number, b: number): number {
+        return a + b
+      }
+      add(1, 2)
+    `, {});
+    expect(result.error).toBeUndefined();
+    expect(result.value).toBe(3);
+  });
+
+  test("TypeScript interface does not cause error", async () => {
+    const result = await executeCode(`
+      interface User { name: string; age: number }
+      const u: User = { name: "Alice", age: 30 }
+      u.name
+    `, {});
+    expect(result.error).toBeUndefined();
+    expect(result.value).toBe("Alice");
+  });
+
+  test("TypeScript generics work", async () => {
+    const result = await executeCode(`
+      function identity<T>(x: T): T { return x }
+      identity<number>(42)
+    `, {});
+    expect(result.error).toBeUndefined();
+    expect(result.value).toBe(42);
+  });
+
+  test("as assertion works", async () => {
+    const result = await executeCode(`
+      const x = (42 as unknown) as string
+      typeof x
+    `, {});
+    expect(result.error).toBeUndefined();
+  });
+
+  test("type-only import is stripped", async () => {
+    // import type should be stripped by transpiler and not cause errors
+    const result = await executeCode(`
+      type MyType = { a: number }
+      const obj: MyType = { a: 42 }
+      obj.a
+    `, {});
+    expect(result.error).toBeUndefined();
+    expect(result.value).toBe(42);
   });
 });

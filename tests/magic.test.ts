@@ -58,4 +58,34 @@ describe("parseMagicCommands", () => {
     const result = parseMagicCommands("%install lodash // install lodash");
     expect(result.magic).toEqual([{ type: "install", packages: ["lodash"] }]);
   });
+
+  test("%timeit extracts correctly and cleanCode is empty", () => {
+    const result = parseMagicCommands("%timeit -n5 await fetch('url')");
+    expect(result.magic[0]?.type).toBe("timeit");
+    expect((result.magic[0] as any)?.runs).toBe(5);
+    expect((result.magic[0] as any)?.code).toBe("await fetch('url')");
+    expect(result.cleanCode.trim()).toBe("");
+  });
+
+  test("%timeit with default runs", () => {
+    const result = parseMagicCommands("%timeit 1+1");
+    expect(result.magic[0]?.type).toBe("timeit");
+    expect((result.magic[0] as any)?.runs).toBe(100);
+    expect((result.magic[0] as any)?.code).toBe("1+1");
+    expect(result.cleanCode.trim()).toBe("");
+  });
+
+  test("%time extracts correctly", () => {
+    const result = parseMagicCommands("%time await Bun.sleep(10)");
+    expect(result.magic[0]?.type).toBe("time");
+    expect((result.magic[0] as any)?.code).toBe("await Bun.sleep(10)");
+    expect(result.cleanCode.trim()).toBe("");
+  });
+
+  test("%timeit with code on following lines leaves cleanCode", () => {
+    const result = parseMagicCommands("%timeit -n5 1+1\nconst x = 42");
+    expect(result.magic).toHaveLength(1);
+    expect(result.magic[0]?.type).toBe("timeit");
+    expect(result.cleanCode).toBe("const x = 42");
+  });
 });
