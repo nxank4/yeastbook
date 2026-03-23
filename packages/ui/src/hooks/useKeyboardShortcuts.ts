@@ -21,6 +21,7 @@ interface ShortcutHandlers {
   onInterrupt: () => void;
   onUndo: () => void;
   onRedo: () => void;
+  onToggleFileExplorer: () => void;
 }
 
 export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
@@ -47,6 +48,11 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "e" || e.key === "E")) {
         e.preventDefault();
         h.onTogglePresentation();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === "b" || e.key === "B") && !e.shiftKey) {
+        e.preventDefault();
+        h.onToggleFileExplorer();
         return;
       }
 

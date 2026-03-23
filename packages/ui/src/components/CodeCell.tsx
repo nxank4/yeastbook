@@ -78,18 +78,28 @@ export function CodeCell({
   }, []);
 
   const handleBeforeMount: BeforeMount = useCallback((monaco) => {
-    // Disable TS semantic validation to prevent "Could not find source file: inmemory://model/N"
+    // Disable TS/JS semantic validation to prevent "Could not find source file: inmemory://model/N"
     // The TS worker tries to resolve all models cross-editor, which fails with multiple editors
-    monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
+    const diagOpts = {
       noSemanticValidation: true,
       noSyntaxValidation: false,
-    });
-    monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
+      noSuggestionDiagnostics: true,
+    };
+    monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions(diagOpts);
+    monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions(diagOpts);
+
+    const compilerOpts = {
       target: monaco.languages.typescript.ScriptTarget.ESNext,
       moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
       allowSyntheticDefaultImports: true,
       esModuleInterop: true,
-    });
+    };
+    monaco.languages.typescript.typescriptDefaults.setCompilerOptions(compilerOpts);
+    monaco.languages.typescript.javascriptDefaults.setCompilerOptions(compilerOpts);
+
+    // Disable eager model sync — prevents the worker from scanning all inmemory models
+    monaco.languages.typescript.typescriptDefaults.setEagerModelSync(false);
+    monaco.languages.typescript.javascriptDefaults.setEagerModelSync(false);
   }, []);
 
   const handleEditorMount: OnMount = useCallback((editor, monaco) => {

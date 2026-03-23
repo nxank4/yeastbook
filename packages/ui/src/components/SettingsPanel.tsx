@@ -138,15 +138,31 @@ export function SettingsPanel({ open, settings, version, bunVersion, fileFormat,
             <h3><i className="bi bi-layout-sidebar" /> Layout</h3>
 
             <label className="settings-row">
-              <span>Max width</span>
+              <span>Cell width</span>
               <select
-                value={settings.layout?.maxWidth ?? "fixed"}
-                onChange={(e) => update({ layout: { ...settings.layout, maxWidth: e.target.value as "fixed" | "auto" } })}
+                value={settings.layout?.maxWidth ?? "medium"}
+                onChange={(e) => update({ layout: { ...settings.layout, maxWidth: e.target.value as "small" | "medium" | "full" | "custom" } })}
               >
-                <option value="fixed">Fixed (1100px)</option>
-                <option value="auto">Full width</option>
+                <option value="small">Small (800px)</option>
+                <option value="medium">Medium (1100px)</option>
+                <option value="full">Full width</option>
+                <option value="custom">Custom</option>
               </select>
             </label>
+            {settings.layout?.maxWidth === "custom" && (
+              <label className="settings-row">
+                <span>Width: {settings.layout?.customWidth ?? 1100}px</span>
+                <input
+                  type="range"
+                  min={400}
+                  max={2400}
+                  step={50}
+                  value={settings.layout?.customWidth ?? 1100}
+                  onChange={(e) => update({ layout: { ...settings.layout, customWidth: Number(e.target.value) } })}
+                  style={{ width: 120 }}
+                />
+              </label>
+            )}
 
             <label className="settings-row">
               <span>Sidebar</span>

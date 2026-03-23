@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "bun run dev:ui & bun run dev:server",
     "dev:server": "bun --watch packages/app/src/cli.ts new --dev",
-    "dev:ui": "bun build packages/ui/src/index.tsx --outdir packages/ui/dist --bundle --watch && cp packages/ui/src/index.html packages/ui/dist/index.html",
+    "dev:ui": "mkdir -p packages/ui/dist && cp packages/ui/src/index.html packages/ui/dist/index.html && bun build packages/ui/src/index.tsx --outdir packages/ui/dist --bundle --watch",
     "build:ui": "bun run --filter @yeastbook/ui build",
     "build:embed": "bun run scripts/embed-assets.ts",
     "build:all": "bun run build:ui && bun run build:embed && bun run build:binary:linux",

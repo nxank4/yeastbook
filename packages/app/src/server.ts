@@ -1,8 +1,8 @@
 // src/server.ts — Bun HTTP+WebSocket server for notebook execution
 
-import { resolve, basename, dirname, join, extname } from "node:path";
+import { resolve, basename, dirname, join, extname, relative } from "node:path";
 import { homedir } from "node:os";
-import { rename, mkdir } from "node:fs/promises";
+import { rename, mkdir, readdir, rm, copyFile, stat, readFile, writeFile } from "node:fs/promises";
 import { existsSync, watch as fsWatch } from "node:fs";
 import { assets } from "./assets.ts";
 import { executeCode, interruptExecution } from "./kernel/execute.ts";
@@ -59,6 +59,65 @@ async function loadEnvFile(notebookPath: string): Promise<Record<string, string>
     }
   } catch {}
   return envVars;
+}
+
+// --- File Explorer helpers ---
+
+interface FileNode {
+  name: string;
+  path: string;
+  type: "file" | "directory";
+  children?: FileNode[];
+  size?: number;
+  isNotebook?: boolean;
+}
+
+const IGNORE_PATTERNS = new Set(["node_modules", ".git", ".yeastbook-state", ".yeastbook-cache"]);
+const IGNORE_PREFIXES = [".yeastbook-"];
+
+function shouldIgnore(name: string): boolean {
+  if (IGNORE_PATTERNS.has(name)) return true;
+  for (const prefix of IGNORE_PREFIXES) {
+    if (name.startsWith(prefix)) return true;
+  }
+  return false;
+}
+
+async function buildFileTree(dir: string, rootDir: string, depth = 0): Promise<FileNode[]> {
+  if (depth > 10) return [];
+  const entries = await readdir(dir, { withFileTypes: true });
+  const nodes: FileNode[] = [];
+
+  for (const entry of entries) {
+    if (shouldIgnore(entry.name)) continue;
+    const fullPath = join(dir, entry.name);
+    const relPath = relative(rootDir, fullPath);
+
+    if (entry.isDirectory()) {
+      const children = await buildFileTree(fullPath, rootDir, depth + 1);
+      nodes.push({ name: entry.name, path: relPath, type: "directory", children });
+    } else {
+      const ext = extname(entry.name).toLowerCase();
+      const isNotebook = ext === ".ybk" || ext === ".ipynb";
+      let size = 0;
+      try { size = (await stat(fullPath)).size; } catch {}
+      nodes.push({ name: entry.name, path: relPath, type: "file", size, isNotebook });
+    }
+  }
+
+  // Sort: directories first, then alphabetical
+  nodes.sort((a, b) => {
+    if (a.type !== b.type) return a.type === "directory" ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  return nodes;
+}
+
+function validatePath(requestedPath: string, rootDir: string): string | null {
+  const resolved = resolve(rootDir, requestedPath);
+  if (!resolved.startsWith(rootDir + "/") && resolved !== rootDir) return null;
+  return resolved;
 }
 
 interface ServerState {
@@ -150,6 +209,23 @@ export async function startServer(filePath: string, port: number = 3000, devMode
     });
     console.log("Dev mode: watching UI dist/ for changes");
   }
+
+  // File explorer watcher: broadcast files_changed to all clients
+  let filesDebounce: ReturnType<typeof setTimeout> | null = null;
+  try {
+    fsWatch(process.cwd(), { recursive: true }, (_event, filename) => {
+      if (typeof filename === "string") {
+        const parts = filename.split("/");
+        if (parts.some((p) => p === "node_modules" || p === ".git" || p.startsWith(".yeastbook-"))) return;
+      }
+      if (filesDebounce) clearTimeout(filesDebounce);
+      filesDebounce = setTimeout(() => {
+        for (const c of clients) {
+          try { c.send(JSON.stringify({ type: "files_changed" })); } catch {}
+        }
+      }, 500);
+    });
+  } catch {}
 
   const CONTENT_TYPES: Record<string, string> = {
     ".html": "text/html; charset=utf-8",
@@ -433,6 +509,81 @@ export async function startServer(filePath: string, port: number = 3000, devMode
           });
           if (renderer.componentUrl) return Response.redirect(renderer.componentUrl);
           return new Response("No component", { status: 404 });
+        },
+      },
+      "/api/files/tree": {
+        GET: async () => {
+          const cwd = process.cwd();
+          const tree = await buildFileTree(cwd, cwd);
+          return Response.json({ tree });
+        },
+      },
+      "/api/files/read": {
+        GET: async (req) => {
+          const url = new URL(req.url);
+          const filePath = url.searchParams.get("path");
+          if (!filePath) return new Response("Missing path", { status: 400 });
+          const cwd = process.cwd();
+          const abs = validatePath(filePath, cwd);
+          if (!abs) return new Response("Invalid path", { status: 403 });
+          try {
+            const file = Bun.file(abs);
+            const st = await stat(abs);
+            if (st.size > 500 * 1024) return Response.json({ content: null, size: st.size, mimeType: "application/octet-stream", tooLarge: true });
+            const content = await file.text();
+            return Response.json({ content, size: st.size, mimeType: file.type || "text/plain" });
+          } catch {
+            return new Response("File not found", { status: 404 });
+          }
+        },
+      },
+      "/api/files/create": {
+        POST: async (req) => {
+          const body = await req.json() as { path: string; type: "file" | "directory"; content?: string };
+          const cwd = process.cwd();
+          const abs = validatePath(body.path, cwd);
+          if (!abs) return new Response("Invalid path", { status: 403 });
+          if (body.type === "directory") {
+            await mkdir(abs, { recursive: true });
+          } else {
+            await mkdir(dirname(abs), { recursive: true });
+            await writeFile(abs, body.content ?? "", "utf-8");
+          }
+          return Response.json({ ok: true });
+        },
+      },
+      "/api/files/rename": {
+        POST: async (req) => {
+          const body = await req.json() as { oldPath: string; newPath: string };
+          const cwd = process.cwd();
+          const absOld = validatePath(body.oldPath, cwd);
+          const absNew = validatePath(body.newPath, cwd);
+          if (!absOld || !absNew) return new Response("Invalid path", { status: 403 });
+          await rename(absOld, absNew);
+          return Response.json({ ok: true });
+        },
+      },
+      "/api/files/delete": {
+        POST: async (req) => {
+          const body = await req.json() as { path: string };
+          const cwd = process.cwd();
+          const abs = validatePath(body.path, cwd);
+          if (!abs) return new Response("Invalid path", { status: 403 });
+          await rm(abs, { recursive: true, force: true });
+          return Response.json({ ok: true });
+        },
+      },
+      "/api/files/duplicate": {
+        POST: async (req) => {
+          const body = await req.json() as { path: string };
+          const cwd = process.cwd();
+          const abs = validatePath(body.path, cwd);
+          if (!abs) return new Response("Invalid path", { status: 403 });
+          const ext = extname(abs);
+          const base = abs.slice(0, -ext.length || undefined);
+          const newPath = `${base}-copy${ext}`;
+          await copyFile(abs, newPath);
+          return Response.json({ ok: true, newPath: relative(cwd, newPath) });
         },
       },
       "/api/dashboard/files": {

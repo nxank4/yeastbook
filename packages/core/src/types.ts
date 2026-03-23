@@ -59,7 +59,8 @@ export interface Settings {
     apiKey: string;
   };
   layout: {
-    maxWidth: "fixed" | "auto";
+    maxWidth: "small" | "medium" | "full" | "custom";
+    customWidth?: number;
     sidebar: boolean;
   };
 }
@@ -69,7 +70,7 @@ export const DEFAULT_SETTINGS: Settings = {
   appearance: { theme: "light", notifications: "show" },
   execution: { autoSaveOnRun: true, clearOutputBeforeRun: false },
   ai: { provider: "disabled", apiKey: "" },
-  layout: { maxWidth: "fixed", sidebar: false },
+  layout: { maxWidth: "medium", sidebar: false },
 };
 
 export type WsOutgoing =
@@ -87,4 +88,5 @@ export type WsIncoming =
   | { type: "install_done"; cellId: string; success: true; packageDts?: Record<string, string> }
   | { type: "install_error"; cellId: string; error: string }
   | { type: "notebook_updated" }
-  | { type: "auto_saved" };
+  | { type: "auto_saved" }
+  | { type: "files_changed" };

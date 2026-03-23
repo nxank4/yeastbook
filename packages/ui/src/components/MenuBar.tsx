@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import type { Cell } from "@yeastbook/core";
+import type { Cell, Settings } from "@yeastbook/core";
 
 interface NotebookFile {
   name: string;
@@ -35,7 +35,8 @@ function OpenFileMenu({ onOpen, onClose }: { onOpen: (path: string) => void; onC
 }
 
 type MenuItem =
-  | { label: string; action: () => void; shortcut?: string; disabled?: boolean }
+  | { label: string; action: () => void; shortcut?: string; disabled?: boolean; icon?: string; checked?: boolean }
+  | { label: string; icon?: string; submenu: MenuItem[] }
   | { separator: true };
 
 interface MenuDef {
@@ -77,6 +78,55 @@ interface Props {
   onRedo: () => void;
   canUndo: boolean;
   canRedo: boolean;
+  onToggleFileExplorer: () => void;
+  settings: Settings;
+  onUpdateSettings: (s: Settings) => void;
+}
+
+function CustomWidthModal({ currentWidth, onApply, onClose }: { currentWidth: number; onApply: (w: number) => void; onClose: () => void }) {
+  const [value, setValue] = useState(String(currentWidth));
+  const numValue = Math.max(400, Math.min(2400, Number(value) || 1100));
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 340 }}>
+        <div className="modal-header">
+          <h2>Custom Cell Width</h2>
+          <button className="settings-close" onClick={onClose}><i className="bi bi-x-lg" /></button>
+        </div>
+        <div style={{ padding: "16px 20px" }}>
+          <label style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>Width in pixels (400–2400)</span>
+            <input
+              type="number"
+              min={400}
+              max={2400}
+              step={50}
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") onApply(numValue); }}
+              className="widget-text-input"
+              style={{ width: "100%", fontSize: 14, padding: "6px 10px" }}
+              autoFocus
+            />
+          </label>
+          <input
+            type="range"
+            min={400}
+            max={2400}
+            step={50}
+            value={numValue}
+            onChange={(e) => setValue(e.target.value)}
+            style={{ width: "100%", marginTop: 8 }}
+          />
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
+            <button className="ai-cancel-btn" onClick={onClose}>Cancel</button>
+            <button className="ai-generate-btn" onClick={() => onApply(numValue)}>Apply</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function MenuBar(props: Props) {
@@ -105,72 +155,87 @@ export function MenuBar(props: Props) {
   }, [openMenu, closeAll]);
 
   const hasFocus = !!props.focusedCellId;
+  const currentWidth = props.settings.layout?.maxWidth ?? "medium";
+  const setWidth = (w: "small" | "medium" | "full" | "custom") => {
+    props.onUpdateSettings({ ...props.settings, layout: { ...props.settings.layout, maxWidth: w } });
+  };
+  const [customWidthInput, setCustomWidthInput] = useState(false);
 
   const menus: MenuDef[] = [
     {
       label: "File",
       items: [
-        { label: "New Notebook (.ybk)", action: props.onNewNotebook },
+        { label: "New Notebook (.ybk)", action: props.onNewNotebook, icon: "bi bi-file-earmark-plus" },
         { separator: true },
-        { label: "Open Notebook...", action: () => setShowOpenFile(true) },
+        { label: "Open Notebook...", action: () => setShowOpenFile(true), icon: "bi bi-folder2-open" },
         { separator: true },
-        { label: "Save", action: props.onSave, shortcut: "Ctrl+S" },
+        { label: "Save", action: props.onSave, shortcut: "Ctrl+S", icon: "bi bi-floppy" },
         { separator: true },
-        { label: "Export as .ipynb", action: props.onExportIpynb },
-        { label: "Export as .ybk", action: props.onExportYbk },
+        { label: "Export as .ipynb", action: props.onExportIpynb, icon: "bi bi-file-earmark-arrow-down" },
+        { label: "Export as .ybk", action: props.onExportYbk, icon: "bi bi-file-earmark-arrow-down" },
       ],
     },
     {
       label: "Edit",
       items: [
-        { label: "Undo", action: props.onUndo, shortcut: "Ctrl+Z", disabled: !props.canUndo },
-        { label: "Redo", action: props.onRedo, shortcut: "Ctrl+Y", disabled: !props.canRedo },
+        { label: "Undo", action: props.onUndo, shortcut: "Ctrl+Z", disabled: !props.canUndo, icon: "bi bi-arrow-counterclockwise" },
+        { label: "Redo", action: props.onRedo, shortcut: "Ctrl+Y", disabled: !props.canRedo, icon: "bi bi-arrow-clockwise" },
         { separator: true },
-        { label: "Cut Cell", action: props.onCutCell, disabled: !hasFocus },
-        { label: "Copy Cell", action: props.onCopyCell, disabled: !hasFocus },
-        { label: "Paste Cell Below", action: props.onPasteCell, disabled: !props.clipboardCell },
+        { label: "Cut Cell", action: props.onCutCell, disabled: !hasFocus, icon: "bi bi-scissors" },
+        { label: "Copy Cell", action: props.onCopyCell, disabled: !hasFocus, icon: "bi bi-copy" },
+        { label: "Paste Cell Below", action: props.onPasteCell, disabled: !props.clipboardCell, icon: "bi bi-clipboard" },
         { separator: true },
-        { label: "Delete Cell", action: props.onDeleteCell, disabled: !hasFocus },
+        { label: "Delete Cell", action: props.onDeleteCell, disabled: !hasFocus, icon: "bi bi-trash3" },
         { separator: true },
-        { label: "Move Cell Up", action: props.onMoveCellUp, disabled: !hasFocus },
-        { label: "Move Cell Down", action: props.onMoveCellDown, disabled: !hasFocus },
+        { label: "Move Cell Up", action: props.onMoveCellUp, disabled: !hasFocus, icon: "bi bi-arrow-up" },
+        { label: "Move Cell Down", action: props.onMoveCellDown, disabled: !hasFocus, icon: "bi bi-arrow-down" },
       ],
     },
     {
       label: "Run",
       items: [
-        { label: "Run Cell", action: props.onRunCell, shortcut: "Ctrl+Enter", disabled: !hasFocus },
-        { label: "Run Cell & Advance", action: props.onRunCell, shortcut: "Shift+Enter", disabled: !hasFocus },
+        { label: "Run Cell", action: props.onRunCell, shortcut: "Ctrl+Enter", disabled: !hasFocus, icon: "bi bi-play-fill" },
+        { label: "Run Cell & Advance", action: props.onRunCell, shortcut: "Shift+Enter", disabled: !hasFocus, icon: "bi bi-skip-forward-fill" },
         { separator: true },
-        { label: "Run All Above", action: props.onRunAllAbove, disabled: !hasFocus || props.runningAll },
-        { label: "Run All Below", action: props.onRunAllBelow, disabled: !hasFocus || props.runningAll },
-        { label: "Run All", action: props.onRunAll, disabled: props.runningAll },
+        { label: "Run All Above", action: props.onRunAllAbove, disabled: !hasFocus || props.runningAll, icon: "bi bi-chevron-double-up" },
+        { label: "Run All Below", action: props.onRunAllBelow, disabled: !hasFocus || props.runningAll, icon: "bi bi-chevron-double-down" },
+        { label: "Run All", action: props.onRunAll, disabled: props.runningAll, icon: "bi bi-fast-forward-fill" },
         { separator: true },
-        { label: "Interrupt Execution", action: props.onInterrupt, shortcut: "I I" },
+        { label: "Interrupt Execution", action: props.onInterrupt, shortcut: "I I", icon: "bi bi-stop-fill" },
         { separator: true },
-        { label: "Restart Kernel", action: props.onRestart },
-        { label: "Restart & Run All", action: props.onRestartAndRunAll },
+        { label: "Restart Kernel", action: props.onRestart, icon: "bi bi-arrow-repeat" },
+        { label: "Restart & Run All", action: props.onRestartAndRunAll, icon: "bi bi-bootstrap-reboot" },
       ],
     },
     {
       label: "View",
       items: [
-        { label: "Presentation Mode", action: props.onTogglePresentation, shortcut: "Ctrl+Shift+E" },
+        { label: "Toggle File Explorer", action: props.onToggleFileExplorer, shortcut: "Ctrl+B", icon: "bi bi-layout-sidebar-inset" },
         { separator: true },
-        { label: "Toggle Dark Mode", action: props.onToggleDarkMode },
+        { label: "Presentation Mode", action: props.onTogglePresentation, shortcut: "Ctrl+Shift+E", icon: "bi bi-easel" },
         { separator: true },
-        { label: "Font Size: Increase", action: props.onFontSizeIncrease },
-        { label: "Font Size: Decrease", action: props.onFontSizeDecrease },
-        { label: "Word Wrap: Toggle", action: props.onToggleWordWrap },
+        { label: "Toggle Dark Mode", action: props.onToggleDarkMode, icon: "bi bi-moon" },
+        { separator: true },
+        { label: "Font Size: Increase", action: props.onFontSizeIncrease, icon: "bi bi-zoom-in" },
+        { label: "Font Size: Decrease", action: props.onFontSizeDecrease, icon: "bi bi-zoom-out" },
+        { label: "Word Wrap: Toggle", action: props.onToggleWordWrap, icon: "bi bi-text-wrap" },
+        { separator: true },
+        { label: "Cell Size", icon: "bi bi-arrows", submenu: [
+          { label: "Small (800px)", action: () => setWidth("small"), checked: currentWidth === "small" },
+          { label: "Medium (1100px)", action: () => setWidth("medium"), checked: currentWidth === "medium" },
+          { label: "Full", action: () => setWidth("full"), checked: currentWidth === "full" },
+          { separator: true },
+          { label: `Custom${currentWidth === "custom" ? ` (${props.settings.layout?.customWidth ?? 1100}px)` : ""}...`, action: () => setCustomWidthInput(true), checked: currentWidth === "custom" },
+        ]},
       ],
     },
     {
       label: "Help",
       items: [
-        { label: "Keyboard Shortcuts", action: props.onShowShortcuts },
+        { label: "Keyboard Shortcuts", action: props.onShowShortcuts, icon: "bi bi-keyboard" },
         { separator: true },
-        { label: "About Yeastbook", action: props.onShowAbout },
-        { label: "GitHub", action: () => window.open("https://github.com/nxank4/yeastbook", "_blank") },
+        { label: "About Yeastbook", action: props.onShowAbout, icon: "bi bi-info-circle" },
+        { label: "GitHub", action: () => window.open("https://github.com/nxank4/yeastbook", "_blank"), icon: "bi bi-github" },
       ],
     },
   ];
@@ -192,6 +257,29 @@ export function MenuBar(props: Props) {
                 {menu.items.map((item, i) =>
                   "separator" in item ? (
                     <hr key={i} className="menu-separator" />
+                  ) : "submenu" in item ? (
+                    <div key={i} className="menu-item-submenu">
+                      <span className="menu-item">
+                        <span className="menu-item-label">{item.icon && <i className={item.icon} />} {item.label}</span>
+                        <i className="bi bi-chevron-right" style={{ fontSize: 10, opacity: 0.5 }} />
+                      </span>
+                      <div className="menu-dropdown menu-submenu">
+                        {item.submenu.map((sub, j) =>
+                          "separator" in sub ? (
+                            <hr key={j} className="menu-separator" />
+                          ) : (
+                            <button
+                              key={j}
+                              className={`menu-item ${"disabled" in sub && sub.disabled ? "disabled" : ""}`}
+                              onClick={() => { if (!("disabled" in sub) || !sub.disabled) { sub.action(); closeAll(); } }}
+                            >
+                              <span className="menu-item-label">{"checked" in sub ? <i className={sub.checked ? "bi bi-check-lg" : ""} style={{ width: 16, display: "inline-block" }} /> : sub.icon && <i className={sub.icon} />} {sub.label}</span>
+                              {"shortcut" in sub && sub.shortcut && <span className="menu-shortcut">{sub.shortcut}</span>}
+                            </button>
+                          )
+                        )}
+                      </div>
+                    </div>
                   ) : (
                     <button
                       key={i}
@@ -199,7 +287,7 @@ export function MenuBar(props: Props) {
                       onClick={() => { if (!item.disabled) { item.action(); closeAll(); } }}
                       disabled={item.disabled}
                     >
-                      <span>{item.label}</span>
+                      <span className="menu-item-label">{"checked" in item ? <i className={item.checked ? "bi bi-check-lg" : ""} style={{ width: 16, display: "inline-block" }} /> : item.icon && <i className={item.icon} />} {item.label}</span>
                       {item.shortcut && <span className="menu-shortcut">{item.shortcut}</span>}
                     </button>
                   )
@@ -215,6 +303,16 @@ export function MenuBar(props: Props) {
             <OpenFileMenu onOpen={props.onOpenFile} onClose={() => setShowOpenFile(false)} />
           </div>
         </div>
+      )}
+      {customWidthInput && (
+        <CustomWidthModal
+          currentWidth={props.settings.layout?.customWidth ?? 1100}
+          onApply={(w) => {
+            props.onUpdateSettings({ ...props.settings, layout: { ...props.settings.layout, maxWidth: "custom", customWidth: w } });
+            setCustomWidthInput(false);
+          }}
+          onClose={() => setCustomWidthInput(false)}
+        />
       )}
     </>
   );

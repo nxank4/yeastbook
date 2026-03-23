@@ -6,6 +6,7 @@ import { MenuBar, ShortcutsModal, AboutModal } from "./components/MenuBar.tsx";
 import { StatusBar } from "./components/StatusBar.tsx";
 import { CommandPalette } from "./components/CommandPalette.tsx";
 import { EnvExplorer } from "./components/EnvExplorer.tsx";
+import { FileExplorer } from "./components/FileExplorer.tsx";
 import { useWebSocket } from "./useWebSocket.ts";
 import { useKeyboardShortcuts, type Mode } from "./hooks/useKeyboardShortcuts.ts";
 import { useHistory } from "./hooks/useHistory.ts";
@@ -42,6 +43,8 @@ export function App() {
   const [isPresenting, setIsPresenting] = useState(
     new URLSearchParams(window.location.search).get("mode") === "present"
   );
+  const [leftSidebarOpen, setLeftSidebarOpen] = useState(true);
+  const [fileTreeVersion, setFileTreeVersion] = useState(0);
   const runAllResolveRef = useRef<(() => void) | null>(null);
   const runAllAbortedRef = useRef(false);
 
@@ -70,7 +73,7 @@ export function App() {
           appearance: { notifications: "show", ...data.appearance },
           execution: data.execution,
           ai: data.ai || { provider: "disabled", apiKey: "" },
-          layout: { maxWidth: "fixed", sidebar: false, ...data.layout },
+          layout: { maxWidth: "medium", sidebar: false, ...data.layout },
         });
         setTheme(data.appearance.theme);
         if (data.version) setVersion(data.version);
@@ -118,8 +121,25 @@ export function App() {
 
   useEffect(() => {
     const root = document.documentElement;
-    root.style.setProperty("--notebook-max-width", settings.layout?.maxWidth === "auto" ? "100%" : "1100px");
-  }, [settings.layout?.maxWidth]);
+    const mode = settings.layout?.maxWidth ?? "medium";
+    const customPx = Math.max(400, Math.min(2400, settings.layout?.customWidth ?? 1100));
+    const WIDTH_MAP: Record<string, string> = { small: "800px", medium: "1100px", full: "100%", custom: `${customPx}px` };
+    const pxValues: Record<string, number> = { small: 800, medium: 1100, full: Infinity, custom: customPx };
+
+    const apply = () => {
+      const available = window.innerWidth;
+      const threshold = pxValues[mode] ?? 1100;
+      if (mode !== "full" && available < threshold + 100) {
+        root.style.setProperty("--notebook-max-width", "100%");
+      } else {
+        root.style.setProperty("--notebook-max-width", WIDTH_MAP[mode] ?? "1100px");
+      }
+    };
+
+    apply();
+    window.addEventListener("resize", apply);
+    return () => window.removeEventListener("resize", apply);
+  }, [settings.layout?.maxWidth, settings.layout?.customWidth]);
 
   // --- WebSocket ---
   const handleWsMessage = useCallback((msg: WsIncoming) => {
@@ -259,6 +279,9 @@ export function App() {
         setSaved(true);
         showToast("Auto-saved");
         break;
+      case "files_changed":
+        setFileTreeVersion((v) => v + 1);
+        break;
     }
   }, [showToast]);
 
@@ -294,11 +317,39 @@ export function App() {
     [send, settings.execution.clearOutputBeforeRun]
   );
 
+  const focusCellEditor = useCallback((targetCellId: string) => {
+    setFocusedCellId(targetCellId);
+    setMode("edit");
+    // Delay to let React render the focused state before querying DOM
+    setTimeout(() => {
+      const el = document.querySelector(`#cell-${targetCellId} .monaco-editor`) as HTMLElement;
+      el?.querySelector("textarea")?.focus();
+    }, 50);
+  }, []);
+
   const handleRunAndAdvance = useCallback(
-    (cellId: string, code: string) => {
+    async (cellId: string, code: string) => {
       handleRunCell(cellId, code);
+      const idx = cellsRef.current.findIndex((c) => c.id === cellId);
+      if (idx >= 0 && idx < cellsRef.current.length - 1) {
+        // Focus next existing cell
+        focusCellEditor(cellsRef.current[idx + 1].id);
+      } else if (idx === cellsRef.current.length - 1) {
+        // Last cell — create a new one and focus it
+        const res = await fetch("/api/cells/insert", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "code", source: "", afterId: cellId }),
+        });
+        const { id } = await res.json();
+        const cell: Cell = { id, cell_type: "code", source: [], outputs: [], execution_count: null, metadata: {} };
+        setCells((prev) => [...prev, cell]);
+        setSaved(true);
+        // Longer delay for new cell to mount
+        setTimeout(() => focusCellEditor(id), 100);
+      }
     },
-    [handleRunCell]
+    [handleRunCell, focusCellEditor]
   );
 
   const handleDeleteCell = useCallback(async (cellId: string) => {
@@ -794,6 +845,7 @@ export function App() {
     { id: "run-above", label: "Run All Above", action: () => handleRunAllAbove() },
     { id: "run-below", label: "Run All Below", action: () => handleRunAllBelow() },
     { id: "interrupt", label: "Interrupt Execution", shortcut: "I I", action: handleInterrupt },
+    { id: "file-explorer", label: "Toggle File Explorer", shortcut: "Ctrl+B", action: () => setLeftSidebarOpen((p) => !p) },
   ], [handleRestart, handleRunAll, handleSave, handleAddCell, toggleTheme, handleExportIpynb, handleExportYbk, togglePresentation, handleRunAllAbove, handleRunAllBelow, handleInterrupt]);
 
   const FONT_SIZES = [12, 13, 14, 16];
@@ -846,6 +898,7 @@ export function App() {
     onInterrupt: handleInterrupt,
     onUndo: history.undo,
     onRedo: history.redo,
+    onToggleFileExplorer: () => setLeftSidebarOpen((p) => !p),
   });
 
   return (
@@ -861,6 +914,10 @@ export function App() {
           <div className="toolbar">
             <span className="toolbar-logo">🍞 yeastbook</span>
             <EditableFileName fileName={fileName} onRename={handleRename} />
+            <span style={{ flex: 1 }} />
+            <button onClick={togglePresentation} className="toolbar-btn present-btn" title="Presentation mode (Ctrl+Shift+E)">
+              &#9654; Present
+            </button>
           </div>
           <MenuBar
             focusedCellId={focusedCellId}
@@ -896,6 +953,9 @@ export function App() {
             onRedo={history.redo}
             canUndo={history.canUndo()}
             canRedo={history.canRedo()}
+            onToggleFileExplorer={() => setLeftSidebarOpen((p) => !p)}
+            settings={settings}
+            onUpdateSettings={handleUpdateSettings}
           />
         </>
       )}
@@ -911,6 +971,24 @@ export function App() {
       <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
       <AboutModal open={aboutOpen} onClose={() => setAboutOpen(false)} version={version} bunVersion={bunVersion} />
       <div className="notebook-layout">
+      {!isPresenting && !leftSidebarOpen && (
+        <button
+          className="sidebar-left-tab"
+          title="Open File Explorer (Ctrl+B)"
+          onClick={() => setLeftSidebarOpen(true)}
+        >
+          <i className="bi bi-folder" />
+        </button>
+      )}
+      {!isPresenting && (
+        <div className={`sidebar-left ${leftSidebarOpen ? "" : "collapsed"}`}>
+          <FileExplorer
+            onOpenNotebook={handleOpenFile}
+            onClose={() => setLeftSidebarOpen(false)}
+            refreshTrigger={fileTreeVersion}
+          />
+        </div>
+      )}
       <NotebookView
         cells={cells}
         busyCells={busyCells}
