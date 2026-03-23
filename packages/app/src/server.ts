@@ -776,6 +776,18 @@ export async function startServer(filePath: string, port: number = 3000, devMode
                     type: "install_error", cellId: msg.cellId, error: result.error,
                   }));
                 }
+              } else if (cmd.type === "reload") {
+                for (const mod of cmd.modules) {
+                  try {
+                    const fresh = await import(`${mod}?t=${Date.now()}`);
+                    // Update context with fresh module
+                    state.context[mod.replace(/[^a-zA-Z0-9_$]/g, "_")] = fresh.default ?? fresh;
+                  } catch {}
+                }
+                ws.send(JSON.stringify({
+                  type: "stream", cellId: msg.cellId, name: "stdout",
+                  text: `♻ Reloaded: ${cmd.modules.join(", ")}\n`,
+                }));
               }
             }
 

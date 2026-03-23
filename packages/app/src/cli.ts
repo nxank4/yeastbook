@@ -10,6 +10,8 @@ import { listNotebooks } from "./dashboard.ts";
 import { loadNotebook, saveNotebook, ybkToIpynb, ipynbToYbk, createEmptyYbk } from "@yeastbook/core";
 import type { IpynbNotebook } from "@yeastbook/core";
 import { diffNotebook, diffText } from "./diff.ts";
+import { exportToScript, stripOutputs } from "./exporter.ts";
+import { templates } from "./templates.ts";
 
 // ---------------------------------------------------------------------------
 // Flag parsing
@@ -21,6 +23,7 @@ interface ParsedArgs {
   noOpen: boolean;
   ipynb: boolean;
   dev: boolean;
+  template: string | null;
 }
 
 function parseFlags(argv: string[]): ParsedArgs {
@@ -29,6 +32,7 @@ function parseFlags(argv: string[]): ParsedArgs {
   let noOpen = false;
   let ipynb = false;
   let dev = false;
+  let template: string | null = null;
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -49,12 +53,18 @@ function parseFlags(argv: string[]): ParsedArgs {
       ipynb = true;
     } else if (arg === "--dev") {
       dev = true;
+    } else if (arg === "--template") {
+      const next = argv[i + 1];
+      if (next !== undefined && !next.startsWith("-")) {
+        template = next;
+        i++;
+      }
     } else {
       positional.push(arg);
     }
   }
 
-  return { positional, port, noOpen, ipynb, dev };
+  return { positional, port, noOpen, ipynb, dev, template };
 }
 
 // ---------------------------------------------------------------------------
@@ -74,22 +84,24 @@ async function checkWritePermission(): Promise<void> {
 
 function printUsage(): void {
   console.log("Usage:");
-  console.log("  yeastbook new [--ipynb] [--port <n>] [--no-open]   Create a new notebook (.ybk default)");
+  console.log("  yeastbook new [--ipynb] [--template <name>] [--port <n>] [--no-open]");
   console.log("  yeastbook <file.ybk|file.ipynb> [--port <n>] [--no-open]   Open a notebook");
   console.log("  yeastbook export <file.ybk>                         Convert .ybk → .ipynb");
   console.log("  yeastbook import <file.ipynb>                       Convert .ipynb → .ybk");
-  console.log("  yeastbook plugin list                               List installed plugins");
-  console.log("  yeastbook plugin install <pkg>                      Install a plugin");
-  console.log("  yeastbook plugin remove <name>                      Remove a plugin");
+  console.log("  yeastbook export-script <file.ybk> [-o output.ts]   Export to TypeScript script");
+  console.log("  yeastbook strip-outputs <file.ybk> [-o output.ybk]  Strip cell outputs");
+  console.log("  yeastbook list-templates                             Show available templates");
+  console.log("  yeastbook plugin list|install|remove                 Manage plugins");
   console.log("  yeastbook diff <file> [--staged] [--commit <ref>]   Show notebook diff");
   console.log("  yeastbook diff <old.ybk> <new.ybk>                  Diff two notebooks");
   console.log("  yeastbook diff-text <file>                           Dump notebook as readable text");
   console.log("");
   console.log("Options:");
-  console.log("  --port <n>    Port to listen on (default: $PORT or 3000)");
-  console.log("  --no-open     Do not open browser after starting server");
-  console.log("  --ipynb       Use .ipynb format (with `new` command)");
-  console.log("  --dev         Dev mode: serve from dist/, watch for UI changes");
+  console.log("  --port <n>        Port to listen on (default: $PORT or 3000)");
+  console.log("  --no-open         Do not open browser after starting server");
+  console.log("  --ipynb           Use .ipynb format (with `new` command)");
+  console.log("  --template <name> Use a template (with `new` command)");
+  console.log("  --dev             Dev mode: serve from dist/, watch for UI changes");
 }
 
 const DEV_NOTEBOOK_FILE = resolve(".yeastbook-dev-notebook");
@@ -260,8 +272,22 @@ async function handlePlugin(subArgs: string[]): Promise<void> {
 // Main dispatch
 // ---------------------------------------------------------------------------
 
-const { positional, port, noOpen, ipynb, dev } = parseFlags(process.argv.slice(2));
+const { positional, port, noOpen, ipynb, dev, template } = parseFlags(process.argv.slice(2));
 const command = positional[0];
+
+// stdin mode for git filter (strip-notebook-outputs)
+if (process.argv.includes("--stdin")) {
+  const input = await new Response(Bun.stdin.stream()).text();
+  const notebook = JSON.parse(input);
+  const stripped = {
+    ...notebook,
+    cells: (notebook.cells ?? []).map((c: any) => ({
+      ...c, outputs: [], executionCount: null,
+    })),
+  };
+  process.stdout.write(JSON.stringify(stripped, null, 2));
+  process.exit(0);
+}
 
 if (!command || command === "new") {
   await checkWritePermission();
@@ -281,6 +307,17 @@ if (!command || command === "new") {
     const ext = ipynb ? ".ipynb" : ".ybk";
     filePath = resolve(`notebook-${Date.now()}${ext}`);
     console.log(`Creating new notebook: ${filePath}`);
+  }
+
+  if (template) {
+    const tmpl = templates[template];
+    if (!tmpl) {
+      console.error(`Unknown template: ${template}`);
+      console.error(`Available: ${Object.keys(templates).join(", ")}`);
+      process.exit(1);
+    }
+    await Bun.write(filePath, JSON.stringify(tmpl, null, 2) + "\n");
+    console.log(`Using template: ${template}`);
   }
 
   const actualPort = await findFreePort(port);
@@ -341,6 +378,34 @@ if (!command || command === "new") {
   process.exit(0);
 } else if (command === "plugin") {
   await handlePlugin(positional.slice(1));
+} else if (command === "export-script") {
+  const filePath = positional[1];
+  if (!filePath) {
+    console.error("Usage: yeastbook export-script <file.ybk> [-o output.ts]");
+    process.exit(1);
+  }
+  const oIdx = positional.indexOf("-o");
+  const outputPath = oIdx !== -1
+    ? positional[oIdx + 1]!
+    : filePath.replace(/\.(ybk|ipynb)$/, ".ts");
+  await exportToScript(resolve(filePath), outputPath);
+  process.exit(0);
+} else if (command === "strip-outputs") {
+  const filePath = positional[1];
+  if (!filePath) {
+    console.error("Usage: yeastbook strip-outputs <file.ybk> [-o output.ybk]");
+    process.exit(1);
+  }
+  const oIdx = positional.indexOf("-o");
+  const outputPath = oIdx !== -1 ? positional[oIdx + 1]! : filePath;
+  await stripOutputs(resolve(filePath), resolve(outputPath));
+  process.exit(0);
+} else if (command === "list-templates") {
+  console.log("Available templates:");
+  for (const name of Object.keys(templates)) {
+    console.log(`  ${name}`);
+  }
+  process.exit(0);
 } else if (command === "diff") {
   const args = process.argv.slice(3);
   const filePath = args.find((a) => !a.startsWith("--"));
