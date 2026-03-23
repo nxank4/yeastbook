@@ -537,6 +537,26 @@ input, textarea, select {
 .env-hint {
   font-size: 10px; color: var(--text-muted); padding: 8px; line-height: 1.5;
 }
+
+/* --- Variable Explorer --- */
+.var-row {
+  display: flex; align-items: center; height: 26px;
+  padding: 0 8px; gap: 6px; font-size: 11px; border-radius: 4px;
+}
+.var-row:hover { background: var(--bg-app); }
+.var-name {
+  color: var(--accent); font-family: 'JetBrains Mono', monospace;
+  font-weight: 500; flex-shrink: 0;
+}
+.var-type {
+  font-size: 10px; color: var(--text-muted); background: var(--bg-toolbar);
+  padding: 1px 4px; border-radius: 3px; flex-shrink: 0;
+}
+.var-preview {
+  color: var(--text-secondary); font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; flex: 1; min-width: 0;
+}
 .env-hint code {
   font-family: 'JetBrains Mono', monospace; font-size: 10px;
   background: var(--bg-app); padding: 1px 4px; border-radius: 3px;

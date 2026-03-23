@@ -7,6 +7,7 @@ import { StatusBar } from "./components/StatusBar.tsx";
 import { CommandPalette } from "./components/CommandPalette.tsx";
 import { EnvExplorer } from "./components/EnvExplorer.tsx";
 import { DependenciesPanel } from "./components/DependenciesPanel.tsx";
+import { VariableExplorer } from "./components/VariableExplorer.tsx";
 import { FileExplorer } from "./components/FileExplorer.tsx";
 import { useWebSocket } from "./useWebSocket.ts";
 import { useKeyboardShortcuts, type Mode } from "./hooks/useKeyboardShortcuts.ts";
@@ -33,6 +34,7 @@ export function App() {
   const [bunVersion, setBunVersion] = useState("");
   const [fileFormat, setFileFormat] = useState<"ybk" | "ipynb">("ybk");
   const [dependencies, setDependencies] = useState<Record<string, string>>({});
+  const [variables, setVariables] = useState<Record<string, { value: unknown; type: string; serializable: boolean }>>({});
   const [runningAll, setRunningAll] = useState(false);
   const [focusedCellId, setFocusedCellId] = useState<string | null>(null);
   const [clipboardCell, setClipboardCell] = useState<Cell | null>(null);
@@ -287,6 +289,13 @@ export function App() {
       case "dependencies_updated":
         setDependencies(msg.dependencies);
         break;
+      case "snapshot_restored":
+        setVariables(msg.variables);
+        showToast(`↩ Session restored — ${msg.restoredCount} variables recovered`);
+        break;
+      case "variables_updated":
+        setVariables(msg.variables);
+        break;
     }
   }, [showToast]);
 
@@ -302,6 +311,7 @@ export function App() {
   useEffect(() => {
     fetch("/api/notebook").then((res) => res.json()).then(loadNotebookData);
     fetch("/api/dependencies").then((r) => r.json()).then((d) => setDependencies(d.dependencies || {})).catch(() => {});
+    fetch("/api/variables").then((r) => r.json()).then((d) => setVariables(d.variables || {})).catch(() => {});
   }, [loadNotebookData]);
 
   // --- Cell operations ---
@@ -482,6 +492,7 @@ export function App() {
     );
     setLiveOutputs(new Map());
     setBusyCells(new Set());
+    setVariables({});
   }, []);
 
   const runCellSequence = useCallback(async (codeCells: Cell[]) => {
@@ -1045,6 +1056,7 @@ export function App() {
       />
       {settings.layout?.sidebar && !isPresenting && (
         <div className="notebook-sidebar">
+          <VariableExplorer variables={variables} />
           <EnvExplorer />
           <DependenciesPanel dependencies={dependencies} />
         </div>

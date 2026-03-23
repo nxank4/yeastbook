@@ -7,6 +7,8 @@ import { existsSync, watch as fsWatch } from "node:fs";
 import { assets } from "./assets.ts";
 import { executeCode, interruptExecution } from "./kernel/execute.ts";
 import { installPackages } from "./kernel/installer.ts";
+import { serializeContext, saveSnapshot, loadSnapshot, clearSnapshot } from "./kernel/snapshot.ts";
+import type { SessionSnapshot } from "./kernel/snapshot.ts";
 import { watchNotebook, createOwnWriteMarker } from "./watcher.ts";
 import { PluginLoader } from "./plugins/loader.ts";
 import {
@@ -184,6 +186,23 @@ export async function startServer(filePath: string, port: number = 3000, devMode
     executionCount: 0,
     context: {},
   };
+
+  // Restore session snapshot if available
+  let lastSnapshotVars: Record<string, { value: unknown; type: string; serializable: boolean }> = {};
+  const snapshot = await loadSnapshot(absPath);
+  if (snapshot) {
+    let restoredCount = 0;
+    for (const [key, entry] of Object.entries(snapshot.variables)) {
+      if (entry.serializable) {
+        state.context[key] = entry.value;
+        (globalThis as Record<string, unknown>)[key] = entry.value;
+        restoredCount++;
+      }
+    }
+    state.executionCount = snapshot.executionCount;
+    lastSnapshotVars = snapshot.variables;
+    console.log(`\x1b[36m↩ Session restored — ${restoredCount} variables recovered\x1b[0m`);
+  }
 
   const clients = new Set<any>();
   const ownWriteMarker = createOwnWriteMarker();
@@ -367,9 +386,14 @@ export async function startServer(filePath: string, port: number = 3000, devMode
         },
       },
       "/api/restart": {
-        POST: () => {
+        POST: async () => {
           state.context = {};
           state.executionCount = 0;
+          lastSnapshotVars = {};
+          await clearSnapshot(state.filePath);
+          for (const c of clients) {
+            c.send(JSON.stringify({ type: "variables_updated", variables: {} }));
+          }
           return Response.json({ ok: true });
         },
       },
@@ -500,6 +524,9 @@ export async function startServer(filePath: string, port: number = 3000, devMode
       "/api/dependencies": {
         GET: () => Response.json({ dependencies: state.notebook.ybk.metadata.dependencies ?? {} }),
       },
+      "/api/variables": {
+        GET: () => Response.json({ variables: lastSnapshotVars }),
+      },
       "/api/types/bun": {
         GET: async () => {
           try {
@@ -624,7 +651,18 @@ export async function startServer(filePath: string, port: number = 3000, devMode
       },
     },
     websocket: {
-      open(ws) { clients.add(ws); },
+      open(ws) {
+        clients.add(ws);
+        // Notify new client of restored session
+        if (Object.keys(lastSnapshotVars).length > 0) {
+          const restoredCount = Object.values(lastSnapshotVars).filter(v => v.serializable).length;
+          ws.send(JSON.stringify({
+            type: "snapshot_restored",
+            restoredCount,
+            variables: lastSnapshotVars,
+          }));
+        }
+      },
       close(ws) { clients.delete(ws); },
       async message(ws, message) {
         try {
@@ -790,6 +828,19 @@ export async function startServer(filePath: string, port: number = 3000, devMode
               ownWriteMarker.mark();
               await state.notebook.save(state.filePath);
               scheduleAutoSave();
+
+              // Save session snapshot & broadcast variables
+              const vars = serializeContext(state.context);
+              lastSnapshotVars = vars;
+              await saveSnapshot(state.filePath, {
+                notebookPath: state.filePath,
+                savedAt: new Date().toISOString(),
+                executionCount: state.executionCount,
+                variables: vars,
+              });
+              for (const client of clients) {
+                client.send(JSON.stringify({ type: "variables_updated", variables: vars }));
+              }
             } else if (magic.length > 0) {
               // Magic-only cell: update source but send idle status
               state.notebook.updateCellSource(msg.cellId, msg.code);
