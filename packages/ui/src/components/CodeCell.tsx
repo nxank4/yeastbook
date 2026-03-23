@@ -164,6 +164,13 @@ export function CodeCell({
           }
         }
       }, true); // true = capturing phase
+
+      // Intercept right-click inside Monaco → show yeastbook context menu
+      domNode.addEventListener("contextmenu", (e: MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setCtxMenu({ x: e.clientX, y: e.clientY, zone: "cell" });
+      }, true);
     }
 
     // Mode change on focus/blur — toggle scroll passthrough
@@ -392,6 +399,7 @@ export function CodeCell({
             readOnly: isPresenting,
             domReadOnly: isPresenting,
             dragAndDrop: false,
+            contextmenu: false,
           }}
         />
       </div>
