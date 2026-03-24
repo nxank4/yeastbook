@@ -4,7 +4,7 @@ import { setCustomNativeDragPreview } from "@atlaskit/pragmatic-drag-and-drop/el
 import { attachClosestEdge, extractClosestEdge, type Edge } from "@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge";
 import { CodeCell } from "./CodeCell.tsx";
 import { MarkdownCell } from "./MarkdownCell.tsx";
-import type { Cell, CellOutput, Settings } from "@yeastbook/core";
+import type { Cell, CellOutput, Settings } from "@codepawl/yeastbook-core";
 import type { Mode } from "../hooks/useKeyboardShortcuts.ts";
 
 interface Props {

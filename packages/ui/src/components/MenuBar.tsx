@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import type { Cell, Settings } from "@yeastbook/core";
+import type { Cell, Settings } from "@codepawl/yeastbook-core";
 
 interface NotebookFile {
   name: string;

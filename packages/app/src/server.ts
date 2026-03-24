@@ -15,8 +15,8 @@ import { PluginLoader } from "./plugins/loader.ts";
 import {
   Notebook, loadNotebook as loadNb, ybkToIpynb, detectFormat, createEmptyYbk,
   parseMagicCommands, detectOutputType, DEFAULT_SETTINGS,
-} from "@yeastbook/core";
-import type { Settings } from "@yeastbook/core";
+} from "@codepawl/yeastbook-core";
+import type { Settings } from "@codepawl/yeastbook-core";
 
 const SETTINGS_DIR = join(homedir(), ".yeastbook");
 const SETTINGS_FILE = join(SETTINGS_DIR, "settings.json");
@@ -404,7 +404,7 @@ export async function startServer(filePath: string, port: number = 3000, devMode
           await rename(state.filePath, newPath);
           state.filePath = newPath;
           // Update notebook format if extension changed
-          const { detectFormat } = await import("@yeastbook/core");
+          const { detectFormat } = await import("@codepawl/yeastbook-core");
           state.notebook.format = detectFormat(newPath);
           return Response.json({ fileName: basename(newPath), fileFormat: state.notebook.format });
         },

@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import type { Settings } from "@yeastbook/core";
+import type { Settings } from "@codepawl/yeastbook-core";
 
 interface Props {
   open: boolean;

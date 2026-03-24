@@ -5,37 +5,117 @@ on:
     types: [published]
 
 jobs:
-  publish-npm:
+  publish-core:
+    name: Publish @codepawl/yeastbook-core to npm
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       id-token: write
     steps:
       - uses: actions/checkout@v4
+
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-      - run: bun install --frozen-lockfile
-      - run: bun run build:ui && bun run build:embed
-      - run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > .npmrc
-      - run: npm publish --provenance --access public
-        working-directory: packages/app
 
-  publish-vscode:
+      # Node is needed for npm publish --provenance (OIDC token signing)
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+
+      - run: bun install --frozen-lockfile
+
+      - name: Publish core package
+        run: npm publish --provenance --access public
+        working-directory: packages/core
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  publish-app:
+    name: Publish @codepawl/yeastbook to npm
+    needs: publish-core
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
+
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-      - run: cd packages/vscode && bun install && bun run build && bun run package
-      - run: bunx @vscode/vsce publish --no-dependencies -p ${{ secrets.VSCE_PAT }}
+
+      # Node is needed for npm publish --provenance (OIDC token signing)
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+
+      - run: bun install --frozen-lockfile
+
+      - name: Build UI and embed assets
+        run: bun run build:ui && bun run build:embed
+
+      - name: Resolve workspace dependency versions
+        run: |
+          # Replace workspace:* with the actual version from core's package.json
+          CORE_VERSION=$(bun -e "console.log(require('../core/package.json').version)")
+          echo "Resolving @codepawl/yeastbook-core to version ${CORE_VERSION}"
+          # Use bun to rewrite the package.json with resolved version
+          bun -e "
+            const pkg = JSON.parse(await Bun.file('package.json').text());
+            pkg.dependencies['@codepawl/yeastbook-core'] = '${CORE_VERSION}';
+            await Bun.write('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+          echo "Resolved package.json:"
+          cat package.json
+        working-directory: packages/app
+
+      - name: Publish app package
+        run: npm publish --provenance --access public
+        working-directory: packages/app
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  publish-vscode:
+    name: Publish VS Code extension
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # Node is needed for vsce
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - run: bun install --frozen-lockfile
+
+      - name: Build extension
+        run: bun run build
+        working-directory: packages/vscode
+
+      - name: Package VSIX
+        run: bunx @vscode/vsce package --no-dependencies
+        working-directory: packages/vscode
+
+      - name: Publish to VS Code Marketplace
+        run: bunx @vscode/vsce publish --no-dependencies -p ${{ secrets.VSCE_PAT }}
         working-directory: packages/vscode
 
   update-homebrew:
+    name: Update Homebrew formula
     runs-on: ubuntu-latest
-    needs: [publish-npm]
+    needs: [publish-app]
     steps:
       - uses: actions/checkout@v4
+
       - name: Update Homebrew formula
         run: |
           TAG="${{ github.event.release.tag_name }}"

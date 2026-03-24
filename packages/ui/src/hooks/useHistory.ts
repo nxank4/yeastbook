@@ -1,5 +1,5 @@
 import { useRef, useCallback } from "react";
-import type { Cell } from "@yeastbook/core";
+import type { Cell } from "@codepawl/yeastbook-core";
 
 export type HistoryEntry =
   | { type: "source_change"; cellId: string; before: string; after: string }

@@ -15,8 +15,8 @@ import { useKeyboardShortcuts, type Mode } from "./hooks/useKeyboardShortcuts.ts
 import { useHistory } from "./hooks/useHistory.ts";
 import { useDebugMode } from "./hooks/useDebugMode.ts";
 import { usePerfMetrics } from "./hooks/usePerfMetrics.ts";
-import type { Cell, CellOutput, WsIncoming, Settings } from "@yeastbook/core";
-import { DEFAULT_SETTINGS } from "@yeastbook/core";
+import type { Cell, CellOutput, WsIncoming, Settings } from "@codepawl/yeastbook-core";
+import { DEFAULT_SETTINGS } from "@codepawl/yeastbook-core";
 
 function getInitialTheme(): "light" | "dark" {
   const stored = localStorage.getItem("yeastbook-theme");

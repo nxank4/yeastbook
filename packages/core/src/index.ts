@@ -1,4 +1,4 @@
-// @yeastbook/core — shared logic and types
+// @codepawl/yeastbook-core — shared logic and types
 export { transformCellCode } from "./transform.ts";
 export { parseMagicCommands } from "./magic.ts";
 export type { MagicCommand, CellMagic, ParseResult } from "./magic.ts";

@@ -1,6 +1,6 @@
 // src/exporter.ts — Export notebook to TypeScript script
 
-import { loadNotebook } from "@yeastbook/core";
+import { loadNotebook } from "@codepawl/yeastbook-core";
 
 export async function exportToScript(
   notebookPath: string,

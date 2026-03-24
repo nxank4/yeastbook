@@ -2,7 +2,7 @@
 
 import { $ } from "bun";
 import { Transpiler } from "bun";
-import { transformCellCode, createSlider, createInput, createToggle, createSelect } from "@yeastbook/core";
+import { transformCellCode, createSlider, createInput, createToggle, createSelect } from "@codepawl/yeastbook-core";
 
 const transpiler = new Transpiler({
   loader: "ts",

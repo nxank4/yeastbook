@@ -1,7 +1,7 @@
 // src/diff.ts — Human-readable .ybk notebook diffs
 
-import { loadNotebook } from "@yeastbook/core";
-import type { YbkNotebook, YbkCell } from "@yeastbook/core";
+import { loadNotebook } from "@codepawl/yeastbook-core";
+import type { YbkNotebook, YbkCell } from "@codepawl/yeastbook-core";
 import { execSync } from "node:child_process";
 
 export interface DiffCounts {

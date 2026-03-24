@@ -1,6 +1,6 @@
 // src/templates.ts — Notebook templates for `yeastbook new --template`
 
-import type { YbkNotebook, YbkCell } from "@yeastbook/core";
+import type { YbkNotebook, YbkCell } from "@codepawl/yeastbook-core";
 
 let idCounter = 0;
 function uuid(): string {

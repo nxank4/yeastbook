@@ -8,7 +8,7 @@ import { SliderWidget } from "./widgets/SliderWidget.tsx";
 import { InputWidget } from "./widgets/InputWidget.tsx";
 import { ToggleWidget } from "./widgets/ToggleWidget.tsx";
 import { SelectWidget } from "./widgets/SelectWidget.tsx";
-import type { CellOutput as CellOutputType } from "@yeastbook/core";
+import type { CellOutput as CellOutputType } from "@codepawl/yeastbook-core";
 
 interface Props {
   outputs: CellOutputType[];

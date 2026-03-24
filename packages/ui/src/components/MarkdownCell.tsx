@@ -3,7 +3,7 @@ import { marked } from "marked";
 import DOMPurify from "dompurify";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu.tsx";
 
-import type { Cell } from "@yeastbook/core";
+import type { Cell } from "@codepawl/yeastbook-core";
 
 interface Props {
   cell: Cell;

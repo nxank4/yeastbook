@@ -1,8 +1,18 @@
 {
-  "name": "@yeastbook/app",
+  "name": "@codepawl/yeastbook",
   "version": "0.0.1",
   "bin": { "yeastbook": "./src/cli.ts" },
+  "publishConfig": { "access": "public" },
+  "files": ["src/", "package.json"],
+  "license": "MIT",
+  "description": "TypeScript-first notebook for Bun — interactive coding, rich output, Python support",
+  "keywords": ["notebook", "jupyter", "bun", "typescript", "repl", "interactive"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nxank4/yeastbook",
+    "directory": "packages/app"
+  },
   "dependencies": {
-    "@yeastbook/core": "workspace:*"
+    "@codepawl/yeastbook-core": "workspace:*"
   }
 }

@@ -2,7 +2,7 @@ import { useRef, useEffect, useCallback, useState } from "react";
 import Editor, { type OnMount, type BeforeMount } from "@monaco-editor/react";
 import { CellOutput } from "./CellOutput.tsx";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu.tsx";
-import type { Cell, CellOutput as CellOutputType } from "@yeastbook/core";
+import type { Cell, CellOutput as CellOutputType } from "@codepawl/yeastbook-core";
 
 let bunTypesLoaded = false;
 

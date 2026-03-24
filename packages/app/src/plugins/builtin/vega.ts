@@ -1,4 +1,4 @@
-import type { YbkPlugin } from "@yeastbook/core";
+import type { YbkPlugin } from "@codepawl/yeastbook-core";
 
 export default {
   name: "yeastbook-vega",

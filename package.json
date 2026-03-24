@@ -8,12 +8,14 @@
     "dev": "bun run dev:ui & bun run dev:server",
     "dev:server": "bun --watch packages/app/src/cli.ts new --dev --dir demos",
     "dev:ui": "mkdir -p packages/ui/dist && cp packages/ui/src/index.html packages/ui/dist/index.html && bun build packages/ui/src/index.tsx --outdir packages/ui/dist --bundle --watch",
-    "build:ui": "bun run --filter @yeastbook/ui build",
+    "build:ui": "bun run --filter @codepawl/yeastbook-ui build",
     "build:embed": "bun run scripts/embed-assets.ts",
     "build:all": "bun run build:ui && bun run build:embed && bun run build:binary:linux",
     "build:binary:linux": "bun build --compile --target=bun-linux-x64 packages/app/src/cli.ts --outfile binaries/yeastbook-linux",
     "build:binary:mac": "bun build --compile --target=bun-macos-arm64 packages/app/src/cli.ts --outfile binaries/yeastbook-macos",
-    "test": "bun test"
+    "test": "bun test",
+    "prepublish": "bun run build:ui && bun run build:embed",
+    "publish:all": "bun run prepublish && cd packages/core && npm publish && cd ../ui && npm publish && cd ../app && npm publish"
   },
   "devDependencies": {
     "@types/bun": "latest",

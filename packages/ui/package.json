@@ -1,11 +1,20 @@
 {
-  "name": "@yeastbook/ui",
+  "name": "@codepawl/yeastbook-ui",
   "version": "0.0.1",
+  "publishConfig": { "access": "public" },
+  "files": ["src/", "dist/", "package.json"],
+  "license": "MIT",
+  "description": "UI components for Yeastbook notebook",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nxank4/yeastbook",
+    "directory": "packages/ui"
+  },
   "dependencies": {
     "@atlaskit/pragmatic-drag-and-drop": "^1.7.9",
     "@atlaskit/pragmatic-drag-and-drop-hitbox": "^1.1.0",
     "@monaco-editor/react": "^4.7.0",
-    "@yeastbook/core": "workspace:*",
+    "@codepawl/yeastbook-core": "workspace:*",
     "bootstrap-icons": "^1.13.1",
     "chart.js": "^4.5.1",
     "dompurify": "^3.3.3",

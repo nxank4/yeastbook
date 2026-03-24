@@ -1,7 +1,7 @@
 import { readdir } from "node:fs/promises";
 import { join, extname } from "node:path";
 import { existsSync } from "node:fs";
-import type { YbkPlugin, OutputRendererPlugin } from "@yeastbook/core";
+import type { YbkPlugin, OutputRendererPlugin } from "@codepawl/yeastbook-core";
 
 function isValidPlugin(obj: unknown): obj is YbkPlugin {
   if (typeof obj !== "object" || obj === null) return false;

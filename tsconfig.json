@@ -28,7 +28,7 @@
 
     // Workspace path mappings
     "paths": {
-      "@yeastbook/core": ["./packages/core/src/index.ts"]
+      "@codepawl/yeastbook-core": ["./packages/core/src/index.ts"]
     }
   },
   "include": [
