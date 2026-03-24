@@ -38,13 +38,13 @@
       { "command": "yeastbook.restartKernel", "title": "Yeastbook: Restart Kernel", "icon": "$(debug-restart)" },
       { "command": "yeastbook.openInBrowser", "title": "Yeastbook: Open in Browser", "icon": "$(globe)" },
       { "command": "yeastbook.exportScript", "title": "Yeastbook: Export as Script" },
-      { "command": "yeastbook.stripOutputs", "title": "Yeastbook: Strip Outputs" }
+      { "command": "yeastbook.stripOutputs", "title": "Yeastbook: Strip Outputs" },
+      { "command": "yeastbook.showServerLogs", "title": "Yeastbook: Show Server Logs", "icon": "$(output)" }
     ],
     "menus": {
       "notebook/toolbar": [
-        { "command": "yeastbook.runAll", "group": "navigation/execute@1", "when": "notebookType == yeastbook" },
-        { "command": "yeastbook.restartKernel", "group": "navigation/execute@2", "when": "notebookType == yeastbook" },
-        { "command": "yeastbook.openInBrowser", "group": "navigation/execute@3", "when": "notebookType == yeastbook" }
+        { "command": "yeastbook.restartKernel", "group": "navigation/execute@1", "when": "notebookType == yeastbook" },
+        { "command": "yeastbook.openInBrowser", "group": "navigation/execute@2", "when": "notebookType == yeastbook" }
       ]
     },
     "configuration": {

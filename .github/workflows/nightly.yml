@@ -1,0 +1,85 @@
+name: Nightly
+
+on:
+  schedule:
+    - cron: "0 4 * * *" # Daily at 4:00 AM UTC
+  workflow_dispatch: # Allow manual trigger
+
+concurrency:
+  group: nightly
+  cancel-in-progress: true
+
+jobs:
+  nightly-publish:
+    name: Publish nightly to npm
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+
+      - run: bun install --frozen-lockfile
+
+      - name: Check for changes since last nightly
+        id: changes
+        run: |
+          # Skip if no commits in last 24 hours
+          LAST_COMMIT=$(git log -1 --format="%ct")
+          NOW=$(date +%s)
+          DIFF=$((NOW - LAST_COMMIT))
+          if [ "$DIFF" -gt 86400 ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "No commits in last 24 hours, skipping nightly."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set nightly version
+        if: steps.changes.outputs.skip != 'true'
+        run: |
+          DATE=$(date +%Y%m%d)
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          NIGHTLY="0.0.0-nightly.${DATE}.${SHORT_SHA}"
+          echo "NIGHTLY_VERSION=${NIGHTLY}" >> "$GITHUB_ENV"
+
+          # Update all package versions
+          bun -e "
+            const fs = require('fs');
+            for (const pkg of ['packages/core/package.json', 'packages/app/package.json']) {
+              const data = JSON.parse(fs.readFileSync(pkg, 'utf8'));
+              data.version = '${NIGHTLY}';
+              if (data.dependencies?.['@codepawl/yeastbook-core']) {
+                data.dependencies['@codepawl/yeastbook-core'] = '${NIGHTLY}';
+              }
+              fs.writeFileSync(pkg, JSON.stringify(data, null, 2) + '\n');
+            }
+          "
+          echo "Set nightly version: ${NIGHTLY}"
+
+      - name: Build UI and embed assets
+        if: steps.changes.outputs.skip != 'true'
+        run: bun run build:ui && bun run build:embed
+
+      - name: Publish core @nightly
+        if: steps.changes.outputs.skip != 'true'
+        run: npm publish --tag nightly --access public --tolerate-republish || true
+        working-directory: packages/core
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish app @nightly
+        if: steps.changes.outputs.skip != 'true'
+        run: npm publish --tag nightly --access public --tolerate-republish || true
+        working-directory: packages/app
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

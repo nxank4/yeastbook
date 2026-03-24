@@ -103,6 +103,7 @@ function printUsage(): void {
   console.log("  yeastbook diff <file> [--staged] [--commit <ref>]   Show notebook diff");
   console.log("  yeastbook diff <old.ybk> <new.ybk>                  Diff two notebooks");
   console.log("  yeastbook diff-text <file>                           Dump notebook as readable text");
+  console.log("  yeastbook doctor                                     Check system requirements");
   console.log("");
   console.log("Options:");
   console.log("  --port <n>        Port to listen on (default: $PORT or 3000)");
@@ -437,6 +438,58 @@ if (!command || command === "new") {
   const otherFile = args.find((a) => !a.startsWith("--") && a !== filePath);
   await diffNotebook(filePath, { staged, commit, otherFile });
   process.exit(0);
+} else if (command === "doctor") {
+  console.log("\x1b[1m🩺 Yeastbook Doctor\x1b[0m\n");
+
+  // Bun
+  try {
+    const bunVer = Bun.version;
+    console.log(`\x1b[32m✓\x1b[0m Bun: v${bunVer}`);
+  } catch {
+    console.log("\x1b[31m✗\x1b[0m Bun: not found");
+  }
+
+  // Python
+  try {
+    const pyProc = Bun.spawnSync(["python3", "--version"]);
+    if (pyProc.exitCode === 0) {
+      console.log(`\x1b[32m✓\x1b[0m Python: ${pyProc.stdout.toString().trim()}`);
+    } else {
+      console.log("\x1b[33m!\x1b[0m Python: not found (optional, needed for Python cells)");
+    }
+  } catch {
+    console.log("\x1b[33m!\x1b[0m Python: not found (optional, needed for Python cells)");
+  }
+
+  // Venv
+  const venvPath = join(process.cwd(), ".venv");
+  if (existsSync(venvPath)) {
+    const isWindows = process.platform === "win32";
+    const pyBin = join(venvPath, isWindows ? "Scripts" : "bin", isWindows ? "python.exe" : "python3");
+    console.log(`\x1b[32m✓\x1b[0m Venv: ${venvPath}${existsSync(pyBin) ? ` (${pyBin})` : " (missing python binary)"}`);
+  } else {
+    console.log("\x1b[33m!\x1b[0m Venv: not found (create with: python3 -m venv .venv)");
+  }
+
+  // Port check
+  try {
+    const testPort = await findFreePort(3000);
+    console.log(`\x1b[32m✓\x1b[0m Port: ${testPort} available`);
+  } catch {
+    console.log("\x1b[31m✗\x1b[0m Port: no free port found (3000-3009)");
+  }
+
+  // Write permission
+  try {
+    await checkWritePermission();
+    console.log("\x1b[32m✓\x1b[0m Write: current directory writable");
+  } catch {
+    console.log("\x1b[31m✗\x1b[0m Write: no write permission in current directory");
+  }
+
+  console.log("");
+  process.exit(0);
+
 } else if (command === "diff-text") {
   const filePath = positional[1];
   if (!filePath) {

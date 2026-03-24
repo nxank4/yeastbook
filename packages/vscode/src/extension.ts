@@ -61,6 +61,12 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(
+    vscode.commands.registerCommand("yeastbook.showServerLogs", () => {
+      kernel?.showOutputChannel();
+    }),
+  );
+
+  context.subscriptions.push(
     vscode.commands.registerCommand("yeastbook.openInBrowser", () => {
       if (!kernel?.isRunning || !kernel.serverPort) {
         vscode.window.showWarningMessage("Kernel not running. Run a cell first.");
