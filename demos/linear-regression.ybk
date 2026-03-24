@@ -31,7 +31,7 @@
           ]
         }
       ],
-      "executionCount": 5
+      "executionCount": 1
     },
     {
       "id": "lr-02-normalize",
@@ -46,7 +46,7 @@
           ]
         }
       ],
-      "executionCount": 6
+      "executionCount": 2
     },
     {
       "id": "lr-03-model",
@@ -57,11 +57,11 @@
           "output_type": "stream",
           "name": "stdout",
           "text": [
-            "Model initialized\nInitial weights: [ \"-0.0032\", \"-0.0050\", \"-0.0022\" ]\n"
+            "Model initialized\nInitial weights: [ \"-0.0043\", \"-0.0046\", \"0.0011\" ]\n"
           ]
         }
       ],
-      "executionCount": 7
+      "executionCount": 3
     },
     {
       "id": "lr-04-train",
@@ -72,11 +72,11 @@
           "output_type": "stream",
           "name": "stdout",
           "text": [
-            "Training started...\nTraining done in 5.1ms\n\nLoss curve (every 100 epochs):\n  Epoch 0: RMSE=$320,117\n  Epoch 100: RMSE=$13,408\n  Epoch 200: RMSE=$11,686\n  Epoch 300: RMSE=$11,194\n  Epoch 400: RMSE=$10,922\n  Epoch 500: RMSE=$10,743\n  Epoch 600: RMSE=$10,623\n  Epoch 700: RMSE=$10,544\n  Epoch 800: RMSE=$10,491\n  Epoch 900: RMSE=$10,455\n  Epoch 1000: RMSE=$10,432\n  Epoch 1100: RMSE=$10,416\n  Epoch 1200: RMSE=$10,406\n  Epoch 1300: RMSE=$10,399\n  Epoch 1400: RMSE=$10,395\n  Epoch 1500: RMSE=$10,392\n  Epoch 1600: RMSE=$10,390\n  Epoch 1700: RMSE=$10,388\n  Epoch 1800: RMSE=$10,387\n  Epoch 1900: RMSE=$10,387\n"
+            "Training started...\nTraining done in 4.8ms\n\nLoss curve (every 100 epochs):\n  Epoch 0: RMSE=$320,117\n  Epoch 100: RMSE=$13,408\n  Epoch 200: RMSE=$11,686\n  Epoch 300: RMSE=$11,194\n  Epoch 400: RMSE=$10,922\n  Epoch 500: RMSE=$10,743\n  Epoch 600: RMSE=$10,623\n  Epoch 700: RMSE=$10,544\n  Epoch 800: RMSE=$10,491\n  Epoch 900: RMSE=$10,455\n  Epoch 1000: RMSE=$10,432\n  Epoch 1100: RMSE=$10,416\n  Epoch 1200: RMSE=$10,406\n  Epoch 1300: RMSE=$10,399\n  Epoch 1400: RMSE=$10,395\n  Epoch 1500: RMSE=$10,392\n  Epoch 1600: RMSE=$10,390\n  Epoch 1700: RMSE=$10,388\n  Epoch 1800: RMSE=$10,387\n  Epoch 1900: RMSE=$10,387\n"
           ]
         }
       ],
-      "executionCount": 8
+      "executionCount": 4
     },
     {
       "id": "lr-05-chart",
@@ -86,59 +86,67 @@
         {
           "output_type": "execute_result",
           "data": {
-            "text/plain": "[\n  320117.0292655496, 13407.839352231284, 11686.469451970255, 11194.459226839523,\n  10921.82835403806, 10743.023465961574, 10623.489747245643, 10543.67757934982, 10490.529249016241,\n  10455.20883078125, 10431.769006917384, 10416.228170505266, 10405.93090789705, 10399.11085438788,\n  10394.595068913379, 10391.60556648173, 10389.626722496845, 10388.31697036813, 10387.45012140099,\n  10386.876424668746\n]"
+            "text/plain": "[\n  320117.0300170063, 13407.83931653864, 11686.469491859643, 11194.45926012984, 10921.828377100244,\n  10743.023481517639, 10623.489757659392, 10543.6775862938, 10490.529253634864, 10455.208833848072,\n  10431.769008951462, 10416.228171853372, 10405.930908790093, 10399.110854979246,\n  10394.595069304913, 10391.605566740905, 10389.626722668392, 10388.316970481661,\n  10387.45012147613, 10386.876424718475\n]"
           },
           "metadata": {},
-          "execution_count": 9,
+          "execution_count": 5,
           "richOutput": {
             "type": "json",
             "data": [
-              320117.0292655496,
-              13407.839352231284,
-              11686.469451970255,
-              11194.459226839523,
-              10921.82835403806,
-              10743.023465961574,
-              10623.489747245643,
-              10543.67757934982,
-              10490.529249016241,
-              10455.20883078125,
-              10431.769006917384,
-              10416.228170505266,
-              10405.93090789705,
-              10399.11085438788,
-              10394.595068913379,
-              10391.60556648173,
-              10389.626722496845,
-              10388.31697036813,
-              10387.45012140099,
-              10386.876424668746
+              320117.0300170063,
+              13407.83931653864,
+              11686.469491859643,
+              11194.45926012984,
+              10921.828377100244,
+              10743.023481517639,
+              10623.489757659392,
+              10543.6775862938,
+              10490.529253634864,
+              10455.208833848072,
+              10431.769008951462,
+              10416.228171853372,
+              10405.930908790093,
+              10399.110854979246,
+              10394.595069304913,
+              10391.605566740905,
+              10389.626722668392,
+              10388.316970481661,
+              10387.45012147613,
+              10386.876424718475
             ]
           }
         }
       ],
-      "executionCount": 9
+      "executionCount": 5
     },
     {
       "id": "lr-06-evaluate",
       "type": "code",
       "source": "// Cell 6: Evaluate on training data\nconst yPred = model.predict(X_norm)\nconst mse = model.mse(y, yPred)\nconst rmse = Math.sqrt(mse)\nconst mae = y.reduce((sum, yi, i) => sum + Math.abs(yi - yPred[i]!), 0) / y.length\n\nconst yMean = y.reduce((a, b) => a + b) / y.length\nconst ssTot = y.reduce((sum, yi) => sum + Math.pow(yi - yMean, 2), 0)\nconst ssRes = y.reduce((sum, yi, i) => sum + Math.pow(yi - yPred[i]!, 2), 0)\nconst r2 = 1 - ssRes / ssTot\n\nconsole.log(\"=== Model Performance ===\")\nconsole.log(`RMSE: $${Math.round(rmse).toLocaleString()}`)\nconsole.log(`MAE:  $${Math.round(mae).toLocaleString()}`)\nconsole.log(`R²:   ${r2.toFixed(4)} (${(r2 * 100).toFixed(1)}% variance explained)`)\nconsole.log(\"\\nModel weights:\", model.weights.map(w => w.toFixed(2)))\nconsole.log(\"Bias:\", model.bias.toFixed(0))",
-      "outputs": [],
-      "executionCount": null
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "=== Model Performance ===\nRMSE: $10,386\nMAE:  $9,429\nR²:   0.9936 (99.4% variance explained)\n\nModel weights: [ \"105609.49\", \"24549.82\", \"675.38\" ]\nBias: 340000\n"
+          ]
+        }
+      ],
+      "executionCount": 6
     },
     {
       "id": "lr-07-compare",
       "type": "code",
       "source": "// Cell 7: Compare predictions vs actual\nconst comparison = dataset.X.map((x, i) => ({\n  features: { sqft: x[0], beds: x[1], age: x[2] },\n  actual: `$${dataset.y[i]!.toLocaleString()}`,\n  predicted: `$${Math.round(yPred[i]!).toLocaleString()}`,\n  error: `${(((yPred[i]! - dataset.y[i]!) / dataset.y[i]!) * 100).toFixed(1)}%`\n}))\ncomparison",
       "outputs": [],
-      "executionCount": 11
+      "executionCount": 7
     },
     {
       "id": "lr-08-predict",
       "type": "code",
       "source": "// Cell 8: Predict on new houses\nfunction predictPrice(\n  sqft: number,\n  bedrooms: number,\n  ageYears: number\n): number {\n  const input = [[\n    (sqft - mean[0]!) / std[0]!,\n    (bedrooms - mean[1]!) / std[1]!,\n    (ageYears - mean[2]!) / std[2]!,\n  ]]\n  return Math.round(model.predict(input)[0]!)\n}\n\nconst newHouses = [\n  { sqft: 1700, beds: 3, age: 7 },\n  { sqft: 3000, beds: 5, age: 1 },\n  { sqft: 700, beds: 1, age: 30 },\n]\n\nnewHouses.map(h => ({\n  ...h,\n  predictedPrice: `$${predictPrice(h.sqft, h.beds, h.age).toLocaleString()}`\n}))",
       "outputs": [],
-      "executionCount": 12
+      "executionCount": 8
     },
     {
       "id": "lr-09-nn-header",
@@ -154,11 +162,11 @@
           "output_type": "stream",
           "name": "stdout",
           "text": [
-            "Neural net initialized: 3 → 8 → 1\nNeural Net RMSE: $27,721\nLinear Model RMSE: $10,386\n"
+            "Neural net initialized: 3 → 8 → 1\nNeural Net RMSE: $34,164\nLinear Model RMSE: $10,386\n"
           ]
         }
       ],
-      "executionCount": 13
+      "executionCount": 9
     },
     {
       "id": "lr-11-chart",
@@ -168,17 +176,17 @@
         {
           "output_type": "execute_result",
           "data": {
-            "text/plain": "27721.205840475264"
+            "text/plain": "34163.80628799041"
           },
           "metadata": {},
-          "execution_count": 14,
+          "execution_count": 10,
           "richOutput": {
             "type": "text",
-            "text": "27721.205840475264"
+            "text": "34163.80628799041"
           }
         }
       ],
-      "executionCount": 14
+      "executionCount": 10
     }
   ]
 }

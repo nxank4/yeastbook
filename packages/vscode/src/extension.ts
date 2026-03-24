@@ -125,6 +125,48 @@ export function activate(context: vscode.ExtensionContext) {
     }),
   );
 
+  context.subscriptions.push(
+    vscode.commands.registerCommand("yeastbook.selectPythonEnvironment", async () => {
+      if (!kernel?.isRunning || !kernel.serverPort) {
+        vscode.window.showWarningMessage("Kernel not running. Run a cell first to start the server.");
+        return;
+      }
+      try {
+        const resp = await fetch(`http://localhost:${kernel.serverPort}/api/python/environments`);
+        const { environments, active } = await resp.json() as {
+          environments: Array<{ path: string; label: string; type: string; version?: string }>;
+          active: string | null;
+        };
+
+        if (environments.length === 0) {
+          vscode.window.showInformationMessage("No Python environments found.");
+          return;
+        }
+
+        const items = environments.map((env) => ({
+          label: env.path === active ? `$(check) ${env.label}` : env.label,
+          description: env.path,
+          detail: env.version ? `Python ${env.version}` : undefined,
+        }));
+
+        const selected = await vscode.window.showQuickPick(items, {
+          placeHolder: "Select Python Environment",
+        });
+
+        if (selected) {
+          await fetch(`http://localhost:${kernel.serverPort}/api/python/select`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ pythonPath: selected.description }),
+          });
+          vscode.window.showInformationMessage(`Python environment set to: ${selected.description}`);
+        }
+      } catch (e) {
+        vscode.window.showErrorMessage(`Failed to fetch environments: ${e}`);
+      }
+    }),
+  );
+
   // Clean up on dispose
   context.subscriptions.push({ dispose: () => kernel?.dispose() });
 }

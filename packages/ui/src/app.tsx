@@ -5,18 +5,17 @@ import { SettingsPanel } from "./components/SettingsPanel.tsx";
 import { MenuBar, ShortcutsModal, AboutModal } from "./components/MenuBar.tsx";
 import { StatusBar } from "./components/StatusBar.tsx";
 import { CommandPalette } from "./components/CommandPalette.tsx";
-import { EnvExplorer } from "./components/EnvExplorer.tsx";
-import { DependenciesPanel } from "./components/DependenciesPanel.tsx";
-import { VariableExplorer } from "./components/VariableExplorer.tsx";
+import { RightSidebar } from "./components/RightSidebar.tsx";
 import { FileExplorer } from "./components/FileExplorer.tsx";
 import { PerfHUD } from "./components/PerfHUD.tsx";
 import { FindReplace } from "./components/FindReplace.tsx";
+import { PythonBootstrapModal, type BootstrapPhase } from "./components/PythonBootstrapModal.tsx";
 import { useWebSocket } from "./useWebSocket.ts";
 import { useKeyboardShortcuts, type Mode } from "./hooks/useKeyboardShortcuts.ts";
 import { useHistory } from "./hooks/useHistory.ts";
 import { useDebugMode } from "./hooks/useDebugMode.ts";
 import { usePerfMetrics } from "./hooks/usePerfMetrics.ts";
-import type { Cell, CellOutput, WsIncoming, Settings } from "@codepawl/yeastbook-core";
+import type { Cell, CellOutput, WsIncoming, Settings, VariableDetails } from "@codepawl/yeastbook-core";
 import { DEFAULT_SETTINGS } from "@codepawl/yeastbook-core";
 
 function getInitialTheme(): "light" | "dark" {
@@ -27,18 +26,23 @@ function getInitialTheme(): "light" | "dark" {
 
 export function App() {
   const [cells, setCells] = useState<Cell[]>([]);
+  const [notebookLoading, setNotebookLoading] = useState(true);
   const [busyCells, setBusyCells] = useState<Set<string>>(new Set());
   const [liveOutputs, setLiveOutputs] = useState<Map<string, CellOutput[]>>(new Map());
   const [fileName, setFileName] = useState("notebook.ipynb");
   const [saved, setSaved] = useState(true);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [theme, setTheme] = useState<"light" | "dark">(getInitialTheme);
   const [settings, setSettings] = useState<Settings>({ ...DEFAULT_SETTINGS, appearance: { ...DEFAULT_SETTINGS.appearance, theme: getInitialTheme() } });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [version, setVersion] = useState("");
   const [bunVersion, setBunVersion] = useState("");
   const [fileFormat, setFileFormat] = useState<"ybk" | "ipynb">("ybk");
+  const [notebookDir, setNotebookDir] = useState("");
   const [dependencies, setDependencies] = useState<Record<string, string>>({});
   const [variables, setVariables] = useState<Record<string, { value: unknown; type: string; serializable: boolean }>>({});
+  const [inspectionResults, setInspectionResults] = useState<Map<string, VariableDetails>>(new Map());
+  const [execTiming, setExecTiming] = useState<Map<string, { startTime: number; endTime?: number; duration?: number }>>(new Map());
   const [runningAll, setRunningAll] = useState(false);
   const [focusedCellId, setFocusedCellId] = useState<string | null>(null);
   const [clipboardCell, setClipboardCell] = useState<Cell | null>(null);
@@ -56,6 +60,13 @@ export function App() {
   const [fileTreeVersion, setFileTreeVersion] = useState(0);
   const [pythonPath, setPythonPath] = useState<string | null>(null);
   const [hasVenv, setHasVenv] = useState<boolean>(false);
+  const [bootstrapOpen, setBootstrapOpen] = useState(false);
+  const [bootstrapPhase, setBootstrapPhase] = useState<BootstrapPhase>("choose");
+  const [bootstrapLogs, setBootstrapLogs] = useState<string[]>([]);
+  const [bootstrapRequirements, setBootstrapRequirements] = useState<string[] | null>(null);
+  const [bootstrapError, setBootstrapError] = useState<string | null>(null);
+  const [bootstrapPythonPath, setBootstrapPythonPath] = useState<string | null>(null);
+  const [notebookDeleted, setNotebookDeleted] = useState(false);
   const runAllResolveRef = useRef<((hadError: boolean) => void) | null>(null);
   const runAllCellErrorRef = useRef(false);
   const runAllAbortedRef = useRef(false);
@@ -64,6 +75,15 @@ export function App() {
   useEffect(() => {
     document.title = `${saved ? "" : "● "}${fileName} — Yeastbook`;
   }, [fileName, saved]);
+
+  // Warn before closing tab with unsaved changes
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (!saved) { e.preventDefault(); }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [saved]);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -91,6 +111,7 @@ export function App() {
         setTheme(data.appearance.theme);
         if (data.version) setVersion(data.version);
         if (data.bunVersion) setBunVersion(data.bunVersion);
+        if (data.notebookDir) setNotebookDir(data.notebookDir);
       });
     fetch("/api/env/info")
       .then((r) => r.json())
@@ -175,7 +196,23 @@ export function App() {
           else next.delete(msg.cellId);
           return next;
         });
+        if (msg.status === "busy") {
+          setExecTiming((prev) => {
+            const next = new Map(prev);
+            next.set(msg.cellId, { startTime: Date.now() });
+            return next;
+          });
+        }
         if (msg.status === "idle") {
+          setExecTiming((prev) => {
+            const next = new Map(prev);
+            const entry = next.get(msg.cellId);
+            if (entry) {
+              const endTime = Date.now();
+              next.set(msg.cellId, { ...entry, endTime, duration: endTime - entry.startTime });
+            }
+            return next;
+          });
           perfRef.current.recordExecEnd(msg.cellId);
           setSaved(true);
           if (runAllResolveRef.current) {
@@ -316,6 +353,9 @@ export function App() {
           if (data.fileFormat) setFileFormat(data.fileFormat);
         });
         break;
+      case "notebook_deleted":
+        setNotebookDeleted(true);
+        break;
       case "auto_saved":
         setSaved(true);
         showToast("Auto-saved");
@@ -332,6 +372,10 @@ export function App() {
         break;
       case "variables_updated":
         setVariables(msg.variables);
+        setInspectionResults(new Map());
+        break;
+      case "variable_details":
+        setInspectionResults((prev) => new Map(prev).set(msg.name, msg.details));
         break;
       case "python_status":
         if (msg.status === "available" && msg.pythonPath) {
@@ -339,6 +383,42 @@ export function App() {
         } else if (msg.status === "unavailable") {
           setPythonPath(null);
         }
+        break;
+      case "python_env_missing":
+        setBootstrapOpen(true);
+        setBootstrapPhase("choose");
+        setBootstrapLogs([]);
+        setBootstrapError(null);
+        setBootstrapRequirements(null);
+        setBootstrapPythonPath(null);
+        break;
+      case "bootstrap_log":
+        setBootstrapLogs((prev) => [...prev, msg.text]);
+        break;
+      case "bootstrap_done":
+        if (msg.success) {
+          if (msg.pythonPath) {
+            setBootstrapPythonPath(msg.pythonPath);
+            setPythonPath(msg.pythonPath);
+            setHasVenv(true);
+          }
+          if (msg.step === "pip") {
+            setBootstrapPhase("done");
+          } else if (msg.step === "venv") {
+            // Will transition to "dependencies" if bootstrap_requirements_found follows,
+            // otherwise stay at "done" (handled below after a brief delay)
+            setTimeout(() => {
+              setBootstrapPhase((p) => p === "creating" ? "done" : p);
+            }, 500);
+          }
+        } else {
+          setBootstrapError(msg.error ?? "Unknown error");
+          setBootstrapPhase("choose");
+        }
+        break;
+      case "bootstrap_requirements_found":
+        setBootstrapRequirements(msg.packages);
+        setBootstrapPhase("dependencies");
         break;
     }
   }, [showToast]);
@@ -355,9 +435,11 @@ export function App() {
     setCells(data.cells || []);
     if (data.fileName) setFileName(data.fileName);
     if (data.fileFormat) setFileFormat(data.fileFormat);
+    setNotebookLoading(false);
   }, []);
 
   useEffect(() => {
+    setNotebookLoading(true);
     fetch("/api/notebook").then((res) => res.json()).then(loadNotebookData);
     fetch("/api/dependencies").then((r) => r.json()).then((d) => setDependencies(d.dependencies || {})).catch(() => {});
     fetch("/api/variables").then((r) => r.json()).then((d) => setVariables(d.variables || {})).catch(() => {});
@@ -385,25 +467,30 @@ export function App() {
     [send]
   );
 
-  const handleCreateVenv = useCallback(async () => {
-    showToast("Creating virtual environment...");
-    try {
-      const res = await fetch("/api/env/create-venv", { method: "POST" });
-      const data = await res.json();
-      if (data.success) {
-        showToast("Virtual environment created");
-        setHasVenv(true);
-        // Refresh env info to get python path
-        const info = await fetch("/api/env/info").then((r) => r.json());
-        if (info.pythonPath) setPythonPath(info.pythonPath);
-        setHasVenv(info.hasVenv ?? true);
-      } else {
-        showToast(`Failed: ${data.error}`);
-      }
-    } catch {
-      showToast("Failed to create virtual environment");
-    }
-  }, [showToast]);
+  const handleCreateVenv = useCallback(() => {
+    setBootstrapOpen(true);
+    setBootstrapPhase("choose");
+    setBootstrapLogs([]);
+    setBootstrapError(null);
+    setBootstrapRequirements(null);
+    setBootstrapPythonPath(null);
+  }, []);
+
+  const handleBootstrapAction = useCallback((
+    action: "create-venv" | "use-system" | "select-custom",
+    opts?: { customPath?: string; installRequirements?: boolean; lewmPreset?: boolean }
+  ) => {
+    setBootstrapLogs([]);
+    setBootstrapError(null);
+    setBootstrapPhase(action === "use-system" ? "creating" : "creating");
+    send({ type: "bootstrap", action, ...opts });
+  }, [send]);
+
+  const handleBootstrapInstallDeps = useCallback((opts: { installRequirements: boolean; lewmPreset: boolean }) => {
+    setBootstrapLogs([]);
+    setBootstrapPhase("installing");
+    send({ type: "bootstrap", action: "create-venv", installRequirements: opts.installRequirements, lewmPreset: opts.lewmPreset });
+  }, [send]);
 
   const handleEditorMount = useCallback((cellId: string, editor: any, monaco: any) => {
     editorRefsMap.current.set(cellId, { editor, monaco });
@@ -496,23 +583,54 @@ export function App() {
   }, []);
 
   const sourceChangeTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const pendingSources = useRef<Map<string, string>>(new Map());
+  const saveStatusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const flushCellSave = useCallback(async (cellId: string) => {
+    const source = pendingSources.current.get(cellId);
+    if (source === undefined) return;
+    pendingSources.current.delete(cellId);
+    const timer = sourceChangeTimers.current.get(cellId);
+    if (timer) { clearTimeout(timer); sourceChangeTimers.current.delete(cellId); }
+    setSaveStatus("saving");
+    try {
+      await fetch(`/api/cells/${cellId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source }),
+      });
+      setSaved(true);
+      setSaveStatus("saved");
+      if (saveStatusTimer.current) clearTimeout(saveStatusTimer.current);
+      saveStatusTimer.current = setTimeout(() => setSaveStatus("idle"), 3000);
+    } catch {
+      setSaveStatus("error");
+    }
+  }, []);
+
+  const flushAllPendingSaves = useCallback(async () => {
+    const entries = Array.from(pendingSources.current.entries());
+    if (entries.length === 0) return;
+    for (const [cellId] of entries) {
+      await flushCellSave(cellId);
+    }
+  }, [flushCellSave]);
+
   const handleSourceChange = useCallback((cellId: string, source: string) => {
     setCells((prev) =>
       prev.map((c) => (c.id === cellId ? { ...c, source: [source] } : c))
     );
     setSaved(false);
-    // Debounce server save — 500ms after last keystroke
+    setSaveStatus("idle");
+    pendingSources.current.set(cellId, source);
+    // Debounce server save — 2000ms after last keystroke
     const existing = sourceChangeTimers.current.get(cellId);
     if (existing) clearTimeout(existing);
     sourceChangeTimers.current.set(cellId, setTimeout(() => {
       sourceChangeTimers.current.delete(cellId);
-      fetch(`/api/cells/${cellId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ source }),
-      });
-    }, 500));
-  }, []);
+      flushCellSave(cellId);
+    }, 2000));
+  }, [flushCellSave]);
 
   const handleAddCell = useCallback(async (type: "code" | "markdown") => {
     const res = await fetch("/api/cells", {
@@ -645,10 +763,19 @@ export function App() {
   }, [send]);
 
   const handleSave = useCallback(async () => {
-    await fetch("/api/save", { method: "POST" });
-    setSaved(true);
-    showToast("Saved");
-  }, [showToast]);
+    // Flush any pending debounced saves first
+    await flushAllPendingSaves();
+    setSaveStatus("saving");
+    try {
+      await fetch("/api/save", { method: "POST" });
+      setSaved(true);
+      setSaveStatus("saved");
+      if (saveStatusTimer.current) clearTimeout(saveStatusTimer.current);
+      saveStatusTimer.current = setTimeout(() => setSaveStatus("idle"), 3000);
+    } catch {
+      setSaveStatus("error");
+    }
+  }, [flushAllPendingSaves]);
 
   const handleInsertCellAt = useCallback(async (type: "code" | "markdown", position: "above" | "below", targetCellId: string) => {
     const targetIdx = cellsRef.current.findIndex((c) => c.id === targetCellId);
@@ -885,16 +1012,28 @@ export function App() {
   }, [loadNotebookData, showToast]);
 
   const handleExportIpynb = useCallback(async () => {
-    const res = await fetch("/api/export/ipynb", { method: "POST" });
+    const outputDir = prompt("Export .ipynb to folder:", notebookDir);
+    if (outputDir === null) return;
+    const res = await fetch("/api/export/ipynb", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ outputDir: outputDir || undefined }),
+    });
     const data = await res.json();
-    showToast(`Exported to ${data.fileName}`);
-  }, [showToast]);
+    showToast(`Exported to ${data.path}`);
+  }, [showToast, notebookDir]);
 
   const handleExportYbk = useCallback(async () => {
-    const res = await fetch("/api/export/ybk", { method: "POST" });
+    const outputDir = prompt("Export .ybk to folder:", notebookDir);
+    if (outputDir === null) return;
+    const res = await fetch("/api/export/ybk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ outputDir: outputDir || undefined }),
+    });
     const data = await res.json();
-    showToast(`Exported to ${data.fileName}`);
-  }, [showToast]);
+    showToast(`Exported to ${data.path}`);
+  }, [showToast, notebookDir]);
 
   const handleCutCell = useCallback(() => {
     if (!focusedCellId) return;
@@ -1054,6 +1193,24 @@ export function App() {
 
   return (
     <>
+      {notebookDeleted && (
+        <div className="modal-overlay" style={{ zIndex: 9999 }}>
+          <div className="modal-content" style={{ maxWidth: 400, textAlign: "center" }}>
+            <div style={{ padding: "32px 24px" }}>
+              <i className="bi bi-file-earmark-x" style={{ fontSize: 40, color: "var(--status-error)", display: "block", marginBottom: 12 }} />
+              <h2 style={{ fontSize: 16, fontWeight: 600, color: "var(--text-primary)", marginBottom: 8 }}>Notebook Deleted</h2>
+              <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: 0, lineHeight: 1.5 }}>
+                This notebook has been deleted. You can close this tab or create a new notebook.
+              </p>
+              <div style={{ marginTop: 20, display: "flex", gap: 8, justifyContent: "center" }}>
+                <button className="dialog-btn dialog-btn-primary" onClick={() => window.location.reload()}>
+                  Reload
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {isPresenting ? (
         <div className="presentation-header">
           <span className="presentation-badge">&#9654; Presenting</span>
@@ -1147,6 +1304,12 @@ export function App() {
         editorRefs={editorRefsMap}
         onSourceChange={handleSourceChange}
       />
+      {notebookLoading && (
+        <div className="notebook-loading">
+          <div className="loading-bar" />
+          <p>Loading notebook...</p>
+        </div>
+      )}
       <NotebookView
         cells={cells}
         busyCells={busyCells}
@@ -1182,18 +1345,38 @@ export function App() {
         onOpenPalette={() => setPaletteOpen(true)}
         onEditorMount={handleEditorMount}
         onSelectAcrossCells={handleSelectAcrossCells}
+        onBlurSave={flushCellSave}
+        execTiming={execTiming}
       />
       {settings.layout?.sidebar && !isPresenting && (
-        <div className="notebook-sidebar">
-          <VariableExplorer variables={variables} />
-          <EnvExplorer />
-          <DependenciesPanel dependencies={dependencies} />
-        </div>
+        <RightSidebar
+          cells={cells}
+          variables={variables}
+          dependencies={dependencies}
+          inspectionResults={inspectionResults}
+          onInspectVariable={(name) => send({ type: "variable_inspect", name })}
+          onScrollToCell={(id) => {
+            document.getElementById(`cell-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+          }}
+        />
       )}
       </div>
       </Profiler>
       {toast && settings.appearance.notifications === "show" && <div className="toast">{toast}</div>}
-      {!isPresenting && <StatusBar mode={mode} connected={connected} saved={saved} notification={settings.appearance.notifications === "minimize" ? toast : null} bunVersion={bunVersion} pythonPath={pythonPath} hasVenv={hasVenv} onCreateVenv={handleCreateVenv} />}
+      {!isPresenting && <StatusBar mode={mode} connected={connected} saved={saved} saveStatus={saveStatus} notification={settings.appearance.notifications === "minimize" ? toast : null} bunVersion={bunVersion} pythonPath={pythonPath} hasVenv={hasVenv} onCreateVenv={handleCreateVenv} onRetrySave={handleSave} />}
+      {bootstrapOpen && (
+        <PythonBootstrapModal
+          onClose={() => setBootstrapOpen(false)}
+          onComplete={(p) => { setPythonPath(p); setHasVenv(true); }}
+          logs={bootstrapLogs}
+          phase={bootstrapPhase}
+          requirements={bootstrapRequirements}
+          error={bootstrapError}
+          pythonPath={bootstrapPythonPath}
+          onAction={handleBootstrapAction}
+          onInstallDeps={handleBootstrapInstallDeps}
+        />
+      )}
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} commands={paletteCommands} />
       {debugEnabled && <PerfHUD metrics={perfMetrics.metrics} />}
     </>

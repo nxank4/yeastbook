@@ -42,6 +42,7 @@ interface Props {
   onOpenPalette?: () => void;
   onEditorMount?: (cellId: string, editor: any, monaco: any) => void;
   onSelectAcrossCells?: (searchText: string) => void;
+  onBlurSave?: (cellId: string) => void;
   isFolded?: boolean;
   onToggleFold?: (cellId: string) => void;
   onChangeLanguage?: (cellId: string, language: string) => void;
@@ -52,7 +53,7 @@ export function CodeCell({
   installing, isCommandFocused, isPresenting, onModeChange, onRun, onRunAndAdvance, onSourceChange, onDelete, onClear, onMoveUp, onMoveDown,
   onRunAllAbove, onRunAllBelow, onInterrupt, onChangeType,
   onRunAll, onCut, onCopy, onPasteBelow, hasClipboard, onInsertAbove, onInsertBelow, onHistoryPush, dragHandleRef,
-  onSave, onOpenPalette, onEditorMount, onSelectAcrossCells, isFolded, onToggleFold, onChangeLanguage,
+  onSave, onOpenPalette, onEditorMount, onSelectAcrossCells, onBlurSave, isFolded, onToggleFold, onChangeLanguage,
 }: Props) {
   const editorRef = useRef<any>(null);
   const monacoRef = useRef<any>(null);
@@ -77,6 +78,8 @@ export function CodeCell({
   onOpenPaletteRef.current = onOpenPalette;
   const isPresentingRef = useRef(isPresenting);
   isPresentingRef.current = isPresenting;
+  const onBlurSaveRef = useRef(onBlurSave);
+  onBlurSaveRef.current = onBlurSave;
   const onSelectAcrossCellsRef = useRef(onSelectAcrossCells);
   onSelectAcrossCellsRef.current = onSelectAcrossCells;
   const markerDisposableRef = useRef<any>(null);
@@ -443,8 +446,10 @@ export function CodeCell({
       }, true); // true = capturing phase
 
       // Intercept right-click inside Monaco → show yeastbook context menu
+      // Hold Shift+Right-Click to bypass and show native browser menu
       domNode.addEventListener("contextmenu", (e: MouseEvent) => {
         if (isPresentingRef.current) return;
+        if (e.shiftKey) return; // Let native browser menu show
         e.preventDefault();
         e.stopPropagation();
         setCtxMenu({ x: e.clientX, y: e.clientY, zone: "cell" });
@@ -459,6 +464,8 @@ export function CodeCell({
     editor.onDidBlurEditorText(() => {
       onModeChange?.("command");
       editor.updateOptions({ scrollbar: { vertical: "hidden", horizontal: "auto", handleMouseWheel: false } });
+      // Flush pending save on blur
+      onBlurSaveRef.current?.(cell.id);
       // Flush pending history on blur
       if (historyTimerRef.current) {
         clearTimeout(historyTimerRef.current);
@@ -526,24 +533,13 @@ export function CodeCell({
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     if (isPresenting) return;
+    if (e.shiftKey) return; // Shift+Right-Click → native browser menu
     e.preventDefault();
     e.stopPropagation();
     const target = e.target as HTMLElement;
     const zone: "cell" | "output" = target.closest(".output-section") ? "output" : "cell";
     setCtxMenu({ x: e.clientX, y: e.clientY, zone });
   }, [isPresenting]);
-
-  const showNativeMenu = useCallback(() => {
-    if (!ctxMenu) return;
-    const { x, y } = ctxMenu;
-    setCtxMenu(null);
-    requestAnimationFrame(() => {
-      const el = document.elementFromPoint(x, y);
-      if (el) {
-        el.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: x, clientY: y }));
-      }
-    });
-  }, [ctxMenu]);
 
   const getOutputText = useCallback((outputs: any[]) => {
     return outputs.map((o: any) => {
@@ -573,8 +569,8 @@ export function CodeCell({
         }},
         { id: "copy-both", label: "Copy Input + Output", icon: "bi bi-clipboard2-plus", onClick: copyInputAndOutput },
         { id: "clear-output", label: "Clear Output", icon: "bi bi-eraser", onClick: () => onClear(cell.id) },
-        { id: "sep1", label: "", separator: true },
-        { id: "native", label: "Show Native Menu", icon: "bi bi-window", onClick: showNativeMenu },
+        { id: "sep-hint", label: "", separator: true },
+        { id: "hint", label: "Shift+Right-Click for browser menu", hint: true },
       ];
     }
     return [
@@ -598,10 +594,10 @@ export function CodeCell({
       { id: "sep5", label: "", separator: true },
       { id: "clear", label: "Clear Output", icon: "bi bi-eraser", onClick: () => onClear(cell.id) },
       { id: "delete", label: "Delete Cell", icon: "bi bi-trash3", danger: true, onClick: () => onDelete(cell.id) },
-      { id: "sep6", label: "", separator: true },
-      { id: "native", label: "Show Native Menu", icon: "bi bi-window", onClick: showNativeMenu },
+      { id: "sep-hint", label: "", separator: true },
+      { id: "hint", label: "Shift+Right-Click for browser menu", hint: true },
     ];
-  }, [ctxMenu, cell.id, displayOutputs, onRun, onRunAll, onCut, onCopy, onPasteBelow, hasClipboard, onMoveUp, onMoveDown, onInsertAbove, onInsertBelow, onClear, onDelete, onChangeType, onChangeLanguage, isPythonCell, showNativeMenu]);
+  }, [ctxMenu, cell.id, displayOutputs, onRun, onRunAll, onCut, onCopy, onPasteBelow, hasClipboard, onMoveUp, onMoveDown, onInsertAbove, onInsertBelow, onClear, onDelete, onChangeType, onChangeLanguage, isPythonCell]);
 
   return (
     <div className={`cell code-cell ${isCommandFocused ? "command-focused" : ""}`} id={`cell-${cell.id}`} onContextMenu={handleContextMenu}>

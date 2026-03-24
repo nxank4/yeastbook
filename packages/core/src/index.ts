@@ -8,7 +8,7 @@ export { loadNotebook, saveNotebook, ybkToIpynb, ipynbToYbk, detectFormat, creat
 export type { YbkNotebook, YbkCell, YbkCellOutput, IpynbNotebook, NotebookFormat } from "./format.ts";
 export { Notebook } from "./notebook.ts";
 export type { YbkPlugin, OutputRendererPlugin } from "./plugins.ts";
-export type { Settings, Cell, CellOutput, CellLanguage, NotebookData, RichOutput, WsIncoming, WsOutgoing } from "./types.ts";
+export type { Settings, Cell, CellOutput, CellLanguage, PythonEnv, NotebookData, RichOutput, WsIncoming, WsOutgoing, VariableDetails } from "./types.ts";
 export { DEFAULT_SETTINGS } from "./types.ts";
 export { detectMimeOutput } from "./mime.ts";
 export type { MimeOutput } from "./mime.ts";

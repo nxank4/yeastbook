@@ -26,8 +26,16 @@
 ### PR Checklist (before merging to staging)
 - `bun test` passes
 - `bun run build:ui` succeeds
-- Manual smoke test: `bun src/cli.ts new` works
+- Manual smoke test: `bun packages/app/src/cli.ts new` works
 - No TypeScript errors
+
+## Package Names
+
+- **`@codepawl/yeastbook`** — CLI + server (packages/app)
+- **`@codepawl/yeastbook-core`** — shared types and logic (packages/core)
+- **`@codepawl/yeastbook-ui`** — React UI components (packages/ui)
+
+All source imports use `@codepawl/yeastbook-core`. Workspace dependencies use `workspace:*`.
 
 ## Versioning
 
@@ -36,14 +44,21 @@
 - `1.0.0` — stable MVP, production-ready
 
 ### MVP Checklist (before 0.1.0)
-- [ ] `bunx yeastbook new` works on a stranger's machine
+- [ ] `bunx @codepawl/yeastbook new` works on a stranger's machine
 - [ ] No crash during normal usage
 - [ ] README sufficient for new users
 - [ ] At least 1-2 external testers confirm usable
 - [ ] Binary builds on Linux + Mac
 
 ### Release History
-- **0.0.1** (current) — P0 core execution + P1 Monaco/rich output + P2 ecosystem (internal dev)
+- **0.0.1** (current) — core execution, Monaco editor, rich output, Python bridge, VS Code extension
+
+## Publishing
+
+```bash
+npm login
+bun run publish:all  # builds UI + embeds assets + publishes core → ui → app
+```
 
 ---
 
@@ -81,3 +96,16 @@ Use HTML imports with `Bun.serve()`. Don't use `vite`. HTML imports fully suppor
 - Use `Bun.serve()` with `routes` object for API endpoints
 - Use `development: { hmr: true }` for hot reload in dev
 - Run with `bun --hot ./index.ts`
+
+## Architecture
+
+### Polyglot Kernel
+- TypeScript cells: executed via `AsyncFunction` in Bun (packages/app/src/kernel/execute.ts)
+- Python cells: persistent daemon via `Bun.spawn` (packages/app/src/kernel/python-bridge.ts + python/yeastbook_kernel.py)
+- Language selection: stored in `cell.metadata.language`, routed server-side via WS `language` field
+- YeastBridge: bi-directional key-value store for cross-language data sharing
+
+### VS Code Extension
+- packages/vscode — notebook serializer + kernel controller
+- CLI discovery: extension path → workspace node_modules → workspace monorepo → global install
+- Configurable via `yeastbook.cliPath` setting

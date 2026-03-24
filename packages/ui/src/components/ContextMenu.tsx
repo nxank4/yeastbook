@@ -9,6 +9,7 @@ export interface ContextMenuItem {
   disabled?: boolean;
   separator?: boolean;
   danger?: boolean;
+  hint?: boolean;
   onClick?: () => void;
 }
 
@@ -64,6 +65,8 @@ export function ContextMenu({ x, y, items, onClose }: Props) {
       {items.map((item, i) =>
         item.separator ? (
           <div key={i} className="context-menu-separator" />
+        ) : item.hint ? (
+          <div key={item.id} className="context-menu-hint">{item.label}</div>
         ) : (
           <button
             key={item.id}

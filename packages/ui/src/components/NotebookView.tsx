@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { draggable, dropTargetForElements, monitorForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { setCustomNativeDragPreview } from "@atlaskit/pragmatic-drag-and-drop/element/set-custom-native-drag-preview";
 import { attachClosestEdge, extractClosestEdge, type Edge } from "@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge";
+import { autoScrollForElements } from "@atlaskit/pragmatic-drag-and-drop-auto-scroll/element";
 import { CodeCell } from "./CodeCell.tsx";
 import { MarkdownCell } from "./MarkdownCell.tsx";
 import type { Cell, CellOutput, Settings } from "@codepawl/yeastbook-core";
@@ -42,6 +43,8 @@ interface Props {
   onOpenPalette: () => void;
   onEditorMount?: (cellId: string, editor: any, monaco: any) => void;
   onSelectAcrossCells?: (searchText: string) => void;
+  onBlurSave?: (cellId: string) => void;
+  execTiming?: Map<string, { startTime: number; endTime?: number; duration?: number }>;
 }
 
 function DraggableCell({ cellId, index, children, isPresenting }: {
@@ -111,8 +114,9 @@ export function NotebookView({
   onRunCell, onRunAndAdvance, onSourceChange, onDeleteCell, onClearOutput, onUpdateMarkdown, onAddCell, onMoveCell,
   onRunAllAbove, onRunAllBelow, onInterrupt, onChangeCellType, onChangeLanguage,
   onInsertCellAt, onCutCell, onCopyCell, onPasteCellBelow, hasClipboard, onRunAll, onHistoryPush, onReorderCell,
-  onSave, onOpenPalette, onEditorMount, onSelectAcrossCells,
+  onSave, onOpenPalette, onEditorMount, onSelectAcrossCells, onBlurSave, execTiming,
 }: Props) {
+  const notebookRef = useRef<HTMLDivElement>(null);
   const [foldedCells, setFoldedCells] = useState<Set<string>>(new Set());
 
   const toggleFold = useCallback((cellId: string) => {
@@ -148,8 +152,21 @@ export function NotebookView({
     });
   }, [cells, onReorderCell]);
 
+  // Auto-scroll when dragging near edges of the notebook container
+  useEffect(() => {
+    const el = notebookRef.current;
+    if (!el || isPresenting) return;
+
+    return autoScrollForElements({
+      element: el,
+      getConfiguration: () => ({
+        maxScrollSpeed: "fast",
+      }),
+    });
+  }, [isPresenting]);
+
   return (
-    <div className={`notebook ${isPresenting ? "presentation-mode" : ""}`}>
+    <div ref={notebookRef} className={`notebook ${isPresenting ? "presentation-mode" : ""}`}>
       {cells.map((cell, idx) => (
         <div key={cell.id} className={`cell-wrapper ${foldedCells.has(cell.id) ? "cell-folded" : ""}`} data-type={cell.cell_type}>
           {cell.cell_type === "code" && (
@@ -157,6 +174,13 @@ export function NotebookView({
               <span className="cell-exec-count">
                 {cell.execution_count ? `[${cell.execution_count}]` : "[ ]"}
               </span>
+              {(() => {
+                const timing = execTiming?.get(cell.id);
+                if (!timing?.duration) return null;
+                const ms = timing.duration;
+                const label = ms < 1000 ? `${ms}ms` : ms < 60000 ? `${(ms / 1000).toFixed(1)}s` : `${(ms / 60000).toFixed(1)}m`;
+                return <span className="cell-exec-time" title={`Finished ${new Date(timing.endTime!).toLocaleTimeString()}`}>{label}</span>;
+              })()}
               {busyCells.has(cell.id) && <div className="loading-bar" />}
             </>
           )}
@@ -201,6 +225,7 @@ export function NotebookView({
                   onInsertBelow={isPresenting ? () => {} : (type) => onInsertCellAt(type, "below", cell.id)}
                   onEditorMount={onEditorMount}
                   onSelectAcrossCells={onSelectAcrossCells}
+                  onBlurSave={onBlurSave}
                   isFolded={foldedCells.has(cell.id)}
                   onToggleFold={toggleFold}
                 />

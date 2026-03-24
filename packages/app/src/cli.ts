@@ -3,7 +3,7 @@
 
 import { resolve, basename, dirname, join } from "node:path";
 import { unlink, mkdir } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { startServer } from "./server.ts";
 import { listNotebooks } from "./dashboard.ts";
@@ -138,12 +138,20 @@ async function autoInstallDeps(notebookPath: string): Promise<void> {
   }
 }
 
+/** Resolve -o flag: if target is a directory, append defaultName inside it; otherwise use as file path. */
+function resolveOutputPath(target: string, defaultName: string): string {
+  const resolved = resolve(target);
+  const isDir = target.endsWith("/") || target.endsWith("\\") ||
+    (existsSync(resolved) && statSync(resolved).isDirectory());
+  return isDir ? join(resolved, defaultName) : resolved;
+}
+
 function printUsage(): void {
   console.log("Usage:");
   console.log("  yeastbook new [--ipynb] [--template <name>] [--port <n>] [--no-open]");
   console.log("  yeastbook <file.ybk|file.ipynb> [--port <n>] [--no-open]   Open a notebook");
-  console.log("  yeastbook export <file.ybk>                         Convert .ybk → .ipynb");
-  console.log("  yeastbook import <file.ipynb>                       Convert .ipynb → .ybk");
+  console.log("  yeastbook export <file.ybk> [-o dir|file]            Convert .ybk → .ipynb");
+  console.log("  yeastbook import <file.ipynb> [-o dir|file]          Convert .ipynb → .ybk");
   console.log("  yeastbook export-script <file.ybk> [-o output.ts]   Export to TypeScript script");
   console.log("  yeastbook strip-outputs <file.ybk> [-o output.ybk]  Strip cell outputs");
   console.log("  yeastbook list-templates                             Show available templates");
@@ -151,8 +159,8 @@ function printUsage(): void {
   console.log("  yeastbook diff <file> [--staged] [--commit <ref>]   Show notebook diff");
   console.log("  yeastbook diff <old.ybk> <new.ybk>                  Diff two notebooks");
   console.log("  yeastbook diff-text <file>                           Dump notebook as readable text");
-  console.log("  yeastbook export-md <file.ybk>                       Convert .ybk → .ybk.md (readable)");
-  console.log("  yeastbook import-md <file.ybk.md>                   Convert .ybk.md → .ybk");
+  console.log("  yeastbook export-md <file.ybk> [-o dir|file]         Convert .ybk → .ybk.md (readable)");
+  console.log("  yeastbook import-md <file.ybk.md> [-o dir|file]     Convert .ybk.md → .ybk");
   console.log("  yeastbook doctor                                     Check system requirements");
   console.log("");
   console.log("Options:");
@@ -179,35 +187,10 @@ async function promptDevNotebook(searchDir: string = process.cwd()): Promise<str
   const notebooks = await listNotebooks(searchDir);
   if (notebooks.length === 0) return null;
 
-  console.log(`\nExisting notebooks in ${searchDir}:`);
-  notebooks.forEach((nb, i) => {
-    const size = (nb.size / 1024).toFixed(1);
-    console.log(`  ${i + 1}. ${nb.name} (${size} KB)`);
-  });
-  console.log(`  ${notebooks.length + 1}. Create new notebook`);
-  console.log("");
-
-  process.stdout.write("Choose [1]: ");
-  const response = await new Promise<string>((resolve) => {
-    const stdin = process.stdin;
-    stdin.resume();
-    stdin.setEncoding("utf8");
-    stdin.once("data", (data: string) => {
-      stdin.pause();
-      resolve(data.trim());
-    });
-  });
-
-  const choice = parseInt(response || "1", 10);
-  let chosen: string | null = null;
-  if (choice >= 1 && choice <= notebooks.length) {
-    chosen = notebooks[choice - 1]!.path;
-  }
-
-  // Save choice so --watch restarts don't re-prompt
-  if (chosen) {
-    await Bun.write(DEV_NOTEBOOK_FILE, chosen);
-  }
+  // Auto-pick the first notebook (no interactive prompt — breaks with --watch and piped stdio)
+  const chosen = notebooks[0]!.path;
+  console.log(`Found ${notebooks.length} notebook(s), opening: ${basename(chosen)}`);
+  await Bun.write(DEV_NOTEBOOK_FILE, chosen);
   return chosen;
 }
 
@@ -403,37 +386,46 @@ if (!command || command === "new") {
 } else if (command === "export") {
   const srcPath = resolve(positional[1] ?? "");
   if (!srcPath || !srcPath.endsWith(".ybk")) {
-    console.error("Usage: yeastbook export <file.ybk>");
+    console.error("Usage: yeastbook export <file.ybk> [-o dir|file]");
     process.exit(1);
   }
   const { notebook } = await loadNotebook(srcPath);
   const ipynbData = ybkToIpynb(notebook);
-  const destPath = join(dirname(srcPath), basename(srcPath, ".ybk") + ".ipynb");
+  const oIdx = positional.indexOf("-o");
+  const defaultDest = join(dirname(srcPath), basename(srcPath, ".ybk") + ".ipynb");
+  const destPath = oIdx !== -1 ? resolveOutputPath(positional[oIdx + 1]!, basename(srcPath, ".ybk") + ".ipynb") : defaultDest;
+  await mkdir(dirname(destPath), { recursive: true });
   await Bun.write(destPath, JSON.stringify(ipynbData, null, 2) + "\n");
   console.log(`Exported: ${srcPath} → ${destPath}`);
 } else if (command === "import") {
   const srcPath = resolve(positional[1] ?? "");
   if (!srcPath || !srcPath.endsWith(".ipynb")) {
-    console.error("Usage: yeastbook import <file.ipynb>");
+    console.error("Usage: yeastbook import <file.ipynb> [-o dir|file]");
     process.exit(1);
   }
   const data: IpynbNotebook = await Bun.file(srcPath).json();
   const ybk = ipynbToYbk(data);
-  const destPath = join(dirname(srcPath), basename(srcPath, ".ipynb") + ".ybk");
+  const oIdx = positional.indexOf("-o");
+  const defaultDest = join(dirname(srcPath), basename(srcPath, ".ipynb") + ".ybk");
+  const destPath = oIdx !== -1 ? resolveOutputPath(positional[oIdx + 1]!, basename(srcPath, ".ipynb") + ".ybk") : defaultDest;
+  await mkdir(dirname(destPath), { recursive: true });
   await Bun.write(destPath, JSON.stringify(ybk, null, 2) + "\n");
   console.log(`Imported: ${srcPath} → ${destPath}`);
 } else if (command === "export-md") {
   const { notebookToMarkdown, extractOutputs } = await import("@codepawl/yeastbook-core");
   const srcPath = resolve(positional[1] ?? "");
   if (!srcPath || !srcPath.endsWith(".ybk")) {
-    console.error("Usage: yeastbook export-md <file.ybk>");
+    console.error("Usage: yeastbook export-md <file.ybk> [-o dir|file]");
     process.exit(1);
   }
   const ybk = await Bun.file(srcPath).json();
   const md = notebookToMarkdown(ybk);
   const outputs = extractOutputs(ybk);
-  const mdPath = srcPath.replace(/\.ybk$/, ".ybk.md");
-  const outPath = srcPath.replace(/\.ybk$/, ".ybk.outputs.json");
+  const oIdx = positional.indexOf("-o");
+  const defaultMdPath = srcPath.replace(/\.ybk$/, ".ybk.md");
+  const mdPath = oIdx !== -1 ? resolveOutputPath(positional[oIdx + 1]!, basename(srcPath, ".ybk") + ".ybk.md") : defaultMdPath;
+  const outPath = mdPath.replace(/\.ybk\.md$/, ".ybk.outputs.json");
+  await mkdir(dirname(mdPath), { recursive: true });
   await Bun.write(mdPath, md);
   if (Object.keys(outputs).length > 0) {
     await Bun.write(outPath, JSON.stringify(outputs, null, 2) + "\n");
@@ -446,15 +438,18 @@ if (!command || command === "new") {
   const { markdownToNotebook } = await import("@codepawl/yeastbook-core");
   const srcPath = resolve(positional[1] ?? "");
   if (!srcPath || !srcPath.endsWith(".ybk.md")) {
-    console.error("Usage: yeastbook import-md <file.ybk.md>");
+    console.error("Usage: yeastbook import-md <file.ybk.md> [-o dir|file]");
     process.exit(1);
   }
   const md = await Bun.file(srcPath).text();
-  const outPath = srcPath.replace(/\.ybk\.md$/, ".ybk.outputs.json");
+  const outputsSidePath = srcPath.replace(/\.ybk\.md$/, ".ybk.outputs.json");
   let outputsJson: string | undefined;
-  try { outputsJson = await Bun.file(outPath).text(); } catch {}
+  try { outputsJson = await Bun.file(outputsSidePath).text(); } catch {}
   const notebook = markdownToNotebook(md, outputsJson);
-  const destPath = srcPath.replace(/\.ybk\.md$/, ".ybk");
+  const oIdx = positional.indexOf("-o");
+  const defaultDest = srcPath.replace(/\.ybk\.md$/, ".ybk");
+  const destPath = oIdx !== -1 ? resolveOutputPath(positional[oIdx + 1]!, basename(srcPath).replace(/\.ybk\.md$/, ".ybk")) : defaultDest;
+  await mkdir(dirname(destPath), { recursive: true });
   await Bun.write(destPath, JSON.stringify(notebook, null, 2) + "\n");
   console.log(`Imported: ${srcPath} → ${destPath}`);
   process.exit(0);
@@ -559,23 +554,96 @@ if (!command || command === "new") {
     console.log("\x1b[33m!\x1b[0m Venv: not found (create with: python3 -m venv .venv)");
   }
 
+  // AI/ML Libraries
+  console.log("\n\x1b[1mPython Libraries:\x1b[0m");
+  const aiLibs = ["torch", "numpy", "matplotlib", "stable_worldmodel"];
+  for (const lib of aiLibs) {
+    try {
+      const proc = Bun.spawnSync(["python3", "-c", `import ${lib}; print(getattr(${lib}, '__version__', 'installed'))`]);
+      if (proc.exitCode === 0) {
+        console.log(`  \x1b[32m✓\x1b[0m ${lib}: ${proc.stdout.toString().trim()}`);
+      } else {
+        console.log(`  \x1b[33m!\x1b[0m ${lib}: not installed`);
+      }
+    } catch {
+      console.log(`  \x1b[33m!\x1b[0m ${lib}: not installed`);
+    }
+  }
+
   // Port check
+  console.log("\n\x1b[1mSystem:\x1b[0m");
   try {
     const testPort = await findFreePort(3000);
-    console.log(`\x1b[32m✓\x1b[0m Port: ${testPort} available`);
+    console.log(`  \x1b[32m✓\x1b[0m Port: ${testPort} available`);
   } catch {
-    console.log("\x1b[31m✗\x1b[0m Port: no free port found (3000-3009)");
+    console.log(`  \x1b[31m✗\x1b[0m Port: no free port found (3000-3009)`);
   }
 
   // Write permission
   try {
     await checkWritePermission();
-    console.log("\x1b[32m✓\x1b[0m Write: current directory writable");
+    console.log(`  \x1b[32m✓\x1b[0m Write: current directory writable`);
   } catch {
-    console.log("\x1b[31m✗\x1b[0m Write: no write permission in current directory");
+    console.log(`  \x1b[31m✗\x1b[0m Write: no write permission in current directory`);
   }
 
   console.log("");
+  process.exit(0);
+
+} else if (command === "init") {
+  const dir = positional[1] || ".";
+  const absDir = resolve(dir);
+  const dirName = basename(absDir);
+
+  console.log(`\x1b[1m📦 Initializing Yeastbook project: ${dirName}\x1b[0m\n`);
+
+  // 1. Create directory
+  await mkdir(absDir, { recursive: true });
+
+  // 2. Create Python venv
+  console.log("Creating Python venv...");
+  try {
+    const venvProc = Bun.spawn(["python3", "-m", "venv", join(absDir, ".venv")], {
+      stdout: "inherit", stderr: "inherit",
+    });
+    await venvProc.exited;
+    console.log("\x1b[32m✓\x1b[0m .venv created");
+
+    // 3. Install base packages
+    const isWindows = process.platform === "win32";
+    const pip = join(absDir, ".venv", isWindows ? "Scripts" : "bin", isWindows ? "pip.exe" : "pip");
+    console.log("Installing numpy, matplotlib...");
+    const pipProc = Bun.spawn([pip, "install", "-q", "numpy", "matplotlib"], {
+      stdout: "inherit", stderr: "inherit",
+    });
+    await pipProc.exited;
+    console.log("\x1b[32m✓\x1b[0m Python packages installed");
+  } catch {
+    console.log("\x1b[33m!\x1b[0m Python not found — skipping venv setup");
+  }
+
+  // 4. Create demo notebook
+  const demoPath = join(absDir, "demo.ybk");
+  if (!existsSync(demoPath)) {
+    const demo = createEmptyYbk();
+    demo.metadata.title = `${dirName} — Demo`;
+    demo.cells = [
+      { id: "intro", type: "markdown", source: `# ${dirName}\n\nWelcome to your Yeastbook project! Press **Shift+Enter** to run cells.` },
+      { id: "ts-demo", type: "code", source: `// TypeScript cell — runs in Bun\nconst greeting = "Hello from Yeastbook!"\nconsole.log(greeting)\n\n;({ __type: "chart", data: [4, 8, 15, 16, 23, 42], config: { chartType: "bar", title: "The Numbers" } })` },
+      { id: "py-demo", type: "code", source: `import numpy as np\nimport matplotlib.pyplot as plt\n\nx = np.linspace(0, 2 * np.pi, 100)\nplt.figure(figsize=(8, 4))\nplt.plot(x, np.sin(x), label="sin")\nplt.plot(x, np.cos(x), label="cos")\nplt.legend()\nplt.title("Trigonometry")`, metadata: { language: "python" } },
+    ];
+    await Bun.write(demoPath, JSON.stringify(demo, null, 2));
+    console.log("\x1b[32m✓\x1b[0m demo.ybk created");
+  }
+
+  // 5. Create .gitignore
+  const gitignorePath = join(absDir, ".gitignore");
+  if (!existsSync(gitignorePath)) {
+    await Bun.write(gitignorePath, ".venv/\nnode_modules/\n*.lock\n");
+    console.log("\x1b[32m✓\x1b[0m .gitignore created");
+  }
+
+  console.log(`\n\x1b[32mDone!\x1b[0m Run:\n  cd ${dir}\n  yeastbook demo.ybk\n`);
   process.exit(0);
 
 } else if (command === "diff-text") {

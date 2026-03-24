@@ -8,7 +8,7 @@ import { assets } from "./assets.ts";
 import { executeCode, interruptExecution } from "./kernel/execute.ts";
 import { installPackages } from "./kernel/installer.ts";
 import { serializeContext, saveSnapshot, loadSnapshot, clearSnapshot } from "./kernel/snapshot.ts";
-import { PythonKernel, YeastBridge } from "./kernel/python-bridge.ts";
+import { PythonKernel, YeastBridge, scanPythonEnvironments } from "./kernel/python-bridge.ts";
 import type { SessionSnapshot } from "./kernel/snapshot.ts";
 import { watchNotebook, createOwnWriteMarker } from "./watcher.ts";
 import { PluginLoader } from "./plugins/loader.ts";
@@ -131,6 +131,8 @@ interface ServerState {
   pythonKernel: PythonKernel | null;
   yeastBridge: YeastBridge;
   sqlEngine: any;
+  bootstrapping: boolean;
+  deleted: boolean;
 }
 
 function hasDistDir(): boolean {
@@ -196,6 +198,8 @@ export async function startServer(filePath: string, port: number = 3000, devMode
     pythonKernel: null,
     yeastBridge,
     sqlEngine: null,
+    bootstrapping: false,
+    deleted: false,
   };
 
   // Inject YeastBridge into execution context so TS cells can use yb.push/get
@@ -239,7 +243,9 @@ export async function startServer(filePath: string, port: number = 3000, devMode
 
   function scheduleAutoSave() {
     if (autoSaveTimer) clearTimeout(autoSaveTimer);
+    if (state.deleted) return;
     autoSaveTimer = setTimeout(async () => {
+      if (state.deleted) return;
       try {
         await embedDepsInMetadata();
         ownWriteMarker.mark();
@@ -252,6 +258,17 @@ export async function startServer(filePath: string, port: number = 3000, devMode
   }
 
   const stopWatcher = watchNotebook(absPath, async () => {
+    if (state.deleted) return;
+    // If the file was removed externally, don't try to reload
+    if (!existsSync(state.filePath)) {
+      state.deleted = true;
+      stopWatcher();
+      if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
+      for (const c of clients) {
+        try { c.send(JSON.stringify({ type: "notebook_deleted" })); } catch {}
+      }
+      return;
+    }
     try {
       const updated = await Notebook.load(state.filePath);
       state.notebook = updated;
@@ -450,6 +467,34 @@ export async function startServer(filePath: string, port: number = 3000, devMode
           return Response.json({ ok: true });
         },
       },
+      "/api/python/environments": {
+        GET: async () => {
+          const envs = await scanPythonEnvironments(dirname(state.filePath));
+          return Response.json({
+            environments: envs,
+            active: state.pythonKernel?.detectedPythonPath ?? null,
+          });
+        },
+      },
+      "/api/python/select": {
+        POST: async (req) => {
+          const { pythonPath } = await req.json() as { pythonPath: string };
+          // Shutdown existing kernel
+          if (state.pythonKernel) {
+            await state.pythonKernel.shutdown();
+            state.pythonKernel = null;
+          }
+          // Store preference in notebook metadata
+          state.notebook.ybk.metadata.pythonPath = pythonPath;
+          ownWriteMarker.mark();
+          await state.notebook.save(state.filePath);
+          // Broadcast new status
+          for (const c of clients) {
+            c.send(JSON.stringify({ type: "python_status", status: "available", pythonPath }));
+          }
+          return Response.json({ ok: true, pythonPath });
+        },
+      },
       "/api/save": {
         POST: async () => {
           ownWriteMarker.mark();
@@ -482,9 +527,12 @@ export async function startServer(filePath: string, port: number = 3000, devMode
         },
       },
       "/api/export/ipynb": {
-        POST: async () => {
+        POST: async (req) => {
+          const body = await req.json().catch(() => ({})) as { outputDir?: string };
           const name = basename(state.filePath).replace(/\.(ybk|ipynb)$/, "");
-          const destPath = join(dirname(state.filePath), name + ".ipynb");
+          const dir = body.outputDir ? resolve(body.outputDir) : dirname(state.filePath);
+          await mkdir(dir, { recursive: true });
+          const destPath = join(dir, name + ".ipynb");
           state.notebook.syncForExport();
           const ipynb = ybkToIpynb(state.notebook.ybk);
           await Bun.write(destPath, JSON.stringify(ipynb, null, 2) + "\n");
@@ -492,9 +540,12 @@ export async function startServer(filePath: string, port: number = 3000, devMode
         },
       },
       "/api/export/ybk": {
-        POST: async () => {
+        POST: async (req) => {
+          const body = await req.json().catch(() => ({})) as { outputDir?: string };
           const name = basename(state.filePath).replace(/\.(ybk|ipynb)$/, "");
-          const destPath = join(dirname(state.filePath), name + ".ybk");
+          const dir = body.outputDir ? resolve(body.outputDir) : dirname(state.filePath);
+          await mkdir(dir, { recursive: true });
+          const destPath = join(dir, name + ".ybk");
           state.notebook.syncForExport();
           await Bun.write(destPath, JSON.stringify(state.notebook.ybk, null, 2) + "\n");
           return Response.json({ path: destPath, fileName: basename(destPath) });
@@ -517,6 +568,7 @@ export async function startServer(filePath: string, port: number = 3000, devMode
             ...settings,
             version: pkg.version,
             bunVersion: Bun.version,
+            notebookDir: dirname(state.filePath),
           });
         },
         POST: async (req) => {
@@ -601,6 +653,69 @@ export async function startServer(filePath: string, port: number = 3000, devMode
       },
       "/api/variables": {
         GET: () => Response.json({ variables: lastSnapshotVars }),
+      },
+      "/api/system/stats": {
+        GET: async () => {
+          const stats: Record<string, unknown> = {
+            cpuPercent: null,
+            memPercent: null,
+            memUsedMB: null,
+            memTotalMB: null,
+            gpuName: null,
+            gpuPercent: null,
+            vramUsedMB: null,
+            vramTotalMB: null,
+            vramPercent: null,
+          };
+          try {
+            // Memory from /proc/meminfo (Linux) or os module
+            const os = await import("node:os");
+            const totalMem = os.totalmem();
+            const freeMem = os.freemem();
+            const usedMem = totalMem - freeMem;
+            stats.memTotalMB = Math.round(totalMem / (1024 * 1024));
+            stats.memUsedMB = Math.round(usedMem / (1024 * 1024));
+            stats.memPercent = Math.round((usedMem / totalMem) * 100);
+
+            // CPU usage: compare two snapshots 100ms apart
+            const cpus1 = os.cpus();
+            await new Promise((r) => setTimeout(r, 100));
+            const cpus2 = os.cpus();
+            let totalIdle = 0, totalTick = 0;
+            for (let i = 0; i < cpus1.length; i++) {
+              const t1 = cpus1[i].times, t2 = cpus2[i].times;
+              const idle = t2.idle - t1.idle;
+              const total = (t2.user - t1.user) + (t2.nice - t1.nice) + (t2.sys - t1.sys) + (t2.irq - t1.irq) + idle;
+              totalIdle += idle;
+              totalTick += total;
+            }
+            stats.cpuPercent = totalTick > 0 ? Math.round(100 - (totalIdle / totalTick * 100)) : 0;
+          } catch { /* ignore */ }
+
+          // GPU via nvidia-smi
+          try {
+            const proc = Bun.spawn(
+              ["nvidia-smi", "--query-gpu=name,utilization.gpu,memory.used,memory.total", "--format=csv,noheader,nounits"],
+              { stdout: "pipe", stderr: "pipe" },
+            );
+            const text = await new Response(proc.stdout).text();
+            const code = await proc.exited;
+            if (code === 0 && text.trim()) {
+              const parts = text.trim().split(",").map((s) => s.trim());
+              if (parts.length >= 4) {
+                stats.gpuName = parts[0];
+                stats.gpuPercent = parseInt(parts[1]) || 0;
+                stats.vramUsedMB = parseInt(parts[2]) || 0;
+                stats.vramTotalMB = parseInt(parts[3]) || 0;
+                stats.vramPercent = (stats.vramTotalMB as number) > 0
+                  ? Math.round(((stats.vramUsedMB as number) / (stats.vramTotalMB as number)) * 100)
+                  : 0;
+              }
+            }
+          } catch { /* no nvidia-smi */ }
+
+          return Response.json(stats);
+        },
       },
       "/api/types/bun": {
         GET: async () => {
@@ -737,6 +852,17 @@ declare function createSelect(config: { options: string[]; value?: string; label
           const abs = validatePath(body.path, cwd);
           if (!abs) return new Response("Invalid path", { status: 403 });
           await rm(abs, { recursive: true, force: true });
+
+          // If the deleted file is the currently-open notebook, stop watching/saving
+          if (abs === state.filePath) {
+            state.deleted = true;
+            stopWatcher();
+            if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
+            for (const c of clients) {
+              try { c.send(JSON.stringify({ type: "notebook_deleted" })); } catch {}
+            }
+          }
+
           return Response.json({ ok: true });
         },
       },
@@ -769,7 +895,7 @@ declare function createSelect(config: { options: string[]; value?: string; label
       },
     },
     websocket: {
-      open(ws) {
+      async open(ws) {
         clients.add(ws);
         // Notify new client of restored session
         if (Object.keys(lastSnapshotVars).length > 0) {
@@ -786,6 +912,20 @@ declare function createSelect(config: { options: string[]; value?: string; label
             type: "python_status", status: "available",
             pythonPath: state.pythonKernel.detectedPythonPath,
           }));
+        } else {
+          // Check if notebook has Python cells but no environment available
+          const hasPythonCells = state.notebook.ybk.cells.some(
+            (c: any) => c.metadata?.language === "python"
+          );
+          if (hasPythonCells) {
+            const savedPath = state.notebook.ybk.metadata.pythonPath;
+            if (!savedPath) {
+              const envs = await scanPythonEnvironments(dirname(state.filePath));
+              if (envs.length === 0) {
+                ws.send(JSON.stringify({ type: "python_env_missing" }));
+              }
+            }
+          }
         }
       },
       close(ws) { clients.delete(ws); },
@@ -794,7 +934,9 @@ declare function createSelect(config: { options: string[]; value?: string; label
           const msg = JSON.parse(message as string) as
             | { type: "execute"; cellId: string; code: string; language?: string }
             | { type: "interrupt" }
-            | { type: "ping"; ts: number };
+            | { type: "ping"; ts: number }
+            | { type: "variable_inspect"; name: string }
+            | { type: "bootstrap"; action: "create-venv" | "use-system" | "select-custom"; customPath?: string; installRequirements?: boolean; lewmPreset?: boolean };
 
           if (msg.type === "ping") {
             ws.send(JSON.stringify({ type: "pong", ts: msg.ts }));
@@ -818,7 +960,9 @@ declare function createSelect(config: { options: string[]; value?: string; label
               try {
                 // Lazy-start Python kernel
                 if (!state.pythonKernel) {
+                  const preferredPython = state.notebook.ybk.metadata.pythonPath;
                   state.pythonKernel = new PythonKernel(dirname(state.filePath), {
+                    pythonPath: preferredPython,
                     onBridgeSet: (key, value) => {
                       state.yeastBridge._onBridgeSet(key, value);
                     },
@@ -1173,6 +1317,175 @@ declare function createSelect(config: { options: string[]; value?: string; label
           } else if (msg.type === "interrupt") {
             interruptExecution();
             state.pythonKernel?.interrupt();
+          } else if (msg.type === "variable_inspect") {
+            const name = msg.name;
+            const val = (state.context as Record<string, unknown>)[name];
+            const details: Record<string, unknown> = {
+              type: typeof val,
+              value: undefined,
+              serializable: false,
+            };
+            try {
+              if (val === null || val === undefined) {
+                details.type = String(val);
+                details.value = val;
+                details.serializable = true;
+              } else if (Array.isArray(val)) {
+                details.type = "Array";
+                details.size = val.length;
+                details.shape = [val.length];
+                details.serializable = true;
+                details.value = val.length <= 10 ? val : val.slice(0, 10);
+                // Check for 2D arrays
+                if (val.length > 0 && Array.isArray(val[0])) {
+                  details.shape = [val.length, (val[0] as unknown[]).length];
+                  details.head = (val as unknown[][]).slice(0, 5);
+                }
+              } else if (typeof val === "object") {
+                const keys = Object.keys(val as object);
+                details.type = (val as { constructor?: { name?: string } }).constructor?.name || "Object";
+                details.size = keys.length;
+                details.columns = keys.slice(0, 50);
+                try {
+                  const json = JSON.stringify(val);
+                  details.memoryBytes = new TextEncoder().encode(json).byteLength;
+                  details.serializable = true;
+                  details.value = keys.length <= 20 ? val : Object.fromEntries(keys.slice(0, 20).map(k => [k, (val as Record<string, unknown>)[k]]));
+                } catch {
+                  details.serializable = false;
+                }
+              } else {
+                details.value = val;
+                details.serializable = true;
+                if (typeof val === "string") details.size = val.length;
+              }
+            } catch {
+              details.type = "unknown";
+            }
+            ws.send(JSON.stringify({ type: "variable_details", name, details }));
+          } else if (msg.type === "bootstrap") {
+            if (state.bootstrapping) {
+              ws.send(JSON.stringify({ type: "bootstrap_done", success: false, step: "venv", error: "Bootstrap already in progress" }));
+              return;
+            }
+            state.bootstrapping = true;
+            const notebookDir = dirname(state.filePath);
+            const decoder = new TextDecoder();
+
+            async function streamProcess(proc: ReturnType<typeof Bun.spawn>) {
+              const stdoutReader = (async () => {
+                const reader = proc.stdout.getReader();
+                while (true) {
+                  const { done, value } = await reader.read();
+                  if (done) break;
+                  ws.send(JSON.stringify({ type: "bootstrap_log", text: decoder.decode(value), stream: "stdout" }));
+                }
+              })();
+              const stderrReader = (async () => {
+                const reader = (proc.stderr as ReadableStream<Uint8Array>).getReader();
+                while (true) {
+                  const { done, value } = await reader.read();
+                  if (done) break;
+                  ws.send(JSON.stringify({ type: "bootstrap_log", text: decoder.decode(value), stream: "stderr" }));
+                }
+              })();
+              await Promise.all([stdoutReader, stderrReader]);
+              return await proc.exited;
+            }
+
+            try {
+              let pythonPath: string | null = null;
+
+              if (msg.action === "create-venv") {
+                const py3 = Bun.which("python3");
+                if (!py3) {
+                  ws.send(JSON.stringify({ type: "bootstrap_done", success: false, step: "venv", error: "python3 not found on PATH. Install Python 3 first." }));
+                  return;
+                }
+
+                ws.send(JSON.stringify({ type: "bootstrap_log", text: "Creating virtual environment...\n", stream: "stdout" }));
+                const venvPath = join(notebookDir, ".venv");
+                const proc = Bun.spawn(["python3", "-m", "venv", venvPath], {
+                  cwd: notebookDir, stdout: "pipe", stderr: "pipe",
+                });
+                const exitCode = await streamProcess(proc);
+
+                if (exitCode !== 0) {
+                  ws.send(JSON.stringify({ type: "bootstrap_done", success: false, step: "venv", error: "Failed to create virtual environment" }));
+                  return;
+                }
+
+                pythonPath = join(venvPath, "bin", "python3");
+                ws.send(JSON.stringify({ type: "bootstrap_log", text: "Virtual environment created.\n", stream: "stdout" }));
+
+              } else if (msg.action === "use-system") {
+                pythonPath = Bun.which("python3") || Bun.which("python") || null;
+                if (!pythonPath) {
+                  ws.send(JSON.stringify({ type: "bootstrap_done", success: false, step: "venv", error: "No Python found on PATH" }));
+                  return;
+                }
+
+              } else if (msg.action === "select-custom") {
+                if (!msg.customPath || !existsSync(msg.customPath)) {
+                  ws.send(JSON.stringify({ type: "bootstrap_done", success: false, step: "venv", error: `Python not found at: ${msg.customPath}` }));
+                  return;
+                }
+                pythonPath = msg.customPath;
+              }
+
+              if (pythonPath) {
+                // Save preference to notebook metadata
+                state.notebook.ybk.metadata.pythonPath = pythonPath;
+                await state.notebook.save(state.filePath);
+
+                // Broadcast python_status
+                for (const c of clients) {
+                  c.send(JSON.stringify({ type: "python_status", status: "available", pythonPath }));
+                }
+              }
+
+              // Check for requirements.txt
+              const reqPath = join(notebookDir, "requirements.txt");
+              let reqPackages: string[] = [];
+              if (existsSync(reqPath)) {
+                const content = await Bun.file(reqPath).text();
+                reqPackages = content.split("\n").map(l => l.trim()).filter(l => l && !l.startsWith("#"));
+              }
+
+              // If we should install requirements or lewm preset
+              if (msg.installRequirements || msg.lewmPreset) {
+                const packages: string[] = [];
+                if (msg.installRequirements && reqPackages.length > 0) {
+                  packages.push("-r", reqPath);
+                }
+                if (msg.lewmPreset) {
+                  packages.push("torch", "torchvision", "stable-worldmodel");
+                }
+
+                if (packages.length > 0 && pythonPath) {
+                  ws.send(JSON.stringify({ type: "bootstrap_log", text: `Installing packages...\n`, stream: "stdout" }));
+                  const pipProc = Bun.spawn([pythonPath, "-m", "pip", "install", ...packages], {
+                    cwd: notebookDir, stdout: "pipe", stderr: "pipe",
+                  });
+                  const pipExit = await streamProcess(pipProc);
+                  if (pipExit !== 0) {
+                    ws.send(JSON.stringify({ type: "bootstrap_done", success: false, step: "pip", error: "pip install failed" }));
+                    return;
+                  }
+                  ws.send(JSON.stringify({ type: "bootstrap_done", success: true, step: "pip", pythonPath }));
+                  return;
+                }
+              }
+
+              // Send done for venv step, and requirements info if found
+              ws.send(JSON.stringify({ type: "bootstrap_done", success: true, step: "venv", pythonPath }));
+              if (reqPackages.length > 0) {
+                ws.send(JSON.stringify({ type: "bootstrap_requirements_found", packages: reqPackages }));
+              }
+
+            } finally {
+              state.bootstrapping = false;
+            }
           }
         } catch (err) {
           // Catch-all: never let a bad message crash the server

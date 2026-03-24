@@ -39,7 +39,8 @@
       { "command": "yeastbook.openInBrowser", "title": "Yeastbook: Open in Browser", "icon": "$(globe)" },
       { "command": "yeastbook.exportScript", "title": "Yeastbook: Export as Script" },
       { "command": "yeastbook.stripOutputs", "title": "Yeastbook: Strip Outputs" },
-      { "command": "yeastbook.showServerLogs", "title": "Yeastbook: Show Server Logs", "icon": "$(output)" }
+      { "command": "yeastbook.showServerLogs", "title": "Yeastbook: Show Server Logs", "icon": "$(output)" },
+      { "command": "yeastbook.selectPythonEnvironment", "title": "Yeastbook: Select Python Environment", "icon": "$(symbol-misc)" }
     ],
     "menus": {
       "notebook/toolbar": [

@@ -20,26 +20,25 @@ function InputDialog({ title, placeholder, onSubmit, onClose }: { title: string;
   const [value, setValue] = useState("");
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 360 }}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 380 }}>
         <div className="modal-header">
           <h2>{title}</h2>
           <button className="settings-close" onClick={onClose}><i className="bi bi-x-lg" /></button>
         </div>
-        <div style={{ padding: "16px 20px" }}>
+        <div className="dialog-body">
           <input
             type="text"
             value={value}
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && value.trim()) onSubmit(value.trim()); if (e.key === "Escape") onClose(); }}
             placeholder={placeholder}
-            className="widget-text-input"
-            style={{ width: "100%", fontSize: 14, padding: "6px 10px" }}
+            className="dialog-input"
             autoFocus
           />
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
-            <button className="ai-cancel-btn" onClick={onClose}>Cancel</button>
-            <button className="ai-generate-btn" onClick={() => value.trim() && onSubmit(value.trim())} disabled={!value.trim()}>Create</button>
-          </div>
+        </div>
+        <div className="dialog-actions">
+          <button className="dialog-btn dialog-btn-secondary" onClick={onClose}>Cancel</button>
+          <button className="dialog-btn dialog-btn-primary" onClick={() => value.trim() && onSubmit(value.trim())} disabled={!value.trim()}>Create</button>
         </div>
       </div>
     </div>
@@ -49,17 +48,20 @@ function InputDialog({ title, placeholder, onSubmit, onClose }: { title: string;
 function ConfirmDialog({ message, onConfirm, onClose }: { message: string; onConfirm: () => void; onClose: () => void }) {
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 360 }}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 380 }}>
         <div className="modal-header">
           <h2>Confirm</h2>
           <button className="settings-close" onClick={onClose}><i className="bi bi-x-lg" /></button>
         </div>
-        <div style={{ padding: "16px 20px" }}>
-          <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: 0 }}>{message}</p>
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
-            <button className="ai-cancel-btn" onClick={onClose}>Cancel</button>
-            <button className="dialog-danger-btn" onClick={onConfirm} autoFocus>Delete</button>
+        <div className="dialog-body">
+          <div className="dialog-icon dialog-icon-danger">
+            <i className="bi bi-exclamation-triangle-fill" />
+            <p>{message}</p>
           </div>
+        </div>
+        <div className="dialog-actions">
+          <button className="dialog-btn dialog-btn-secondary" onClick={onClose}>Cancel</button>
+          <button className="dialog-btn dialog-btn-danger" onClick={onConfirm} autoFocus>Delete</button>
         </div>
       </div>
     </div>

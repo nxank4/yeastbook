@@ -34,6 +34,9 @@ export class YbkKernel {
   private output: vscode.OutputChannel;
   private retryCount = 0;
   private maxRetries = 5;
+  private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+  private staleCheckInterval: ReturnType<typeof setInterval> | null = null;
+  private lastPong: number = 0;
 
   // Pending executions: cellId → { execution, resolve }
   private pending = new Map<string, {
@@ -222,6 +225,10 @@ export class YbkKernel {
   }
 
   async stopServer(): Promise<void> {
+    // Clear heartbeat intervals
+    if (this.heartbeatInterval) { clearInterval(this.heartbeatInterval); this.heartbeatInterval = null; }
+    if (this.staleCheckInterval) { clearInterval(this.staleCheckInterval); this.staleCheckInterval = null; }
+
     // Send shutdown message to gracefully stop Python daemon
     if (this.ws?.readyState === WebSocket.OPEN) {
       try {
@@ -277,7 +284,25 @@ export class YbkKernel {
       this.ws.on("open", () => {
         clearTimeout(timeout);
         this.retryCount = 0;
+        this.lastPong = Date.now();
         this.output.appendLine("WebSocket connected.");
+
+        // Start heartbeat
+        if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
+        this.heartbeatInterval = setInterval(() => {
+          if (this.ws?.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify({ type: "ping", ts: Date.now() }));
+          }
+        }, 30000);
+
+        if (this.staleCheckInterval) clearInterval(this.staleCheckInterval);
+        this.staleCheckInterval = setInterval(() => {
+          if (this.lastPong && Date.now() - this.lastPong > 90000) {
+            this.output.appendLine("Heartbeat lost, reconnecting...");
+            this.ws?.close();
+          }
+        }, 30000);
+
         resolve();
       });
 
@@ -334,6 +359,12 @@ export class YbkKernel {
   }
 
   private handleMessage(msg: WsIncoming): void {
+    // Handle heartbeat pong
+    if (msg.type === "pong") {
+      this.lastPong = Date.now();
+      return;
+    }
+
     const cellId = msg.cellId;
     if (!cellId) {
       // Non-cell messages (status updates, etc.)

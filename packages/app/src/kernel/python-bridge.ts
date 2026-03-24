@@ -9,6 +9,13 @@ import type { Subprocess } from "bun";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
+export interface PythonEnv {
+  path: string;
+  label: string;
+  type: "venv" | "conda" | "system";
+  version?: string;
+}
+
 export interface PythonExecResult {
   value: string | null;
   stdout: string;
@@ -84,9 +91,10 @@ export class PythonKernel {
 
   constructor(
     notebookDir: string,
-    opts?: { onBridgeSet?: (key: string, value: unknown) => void },
+    opts?: { pythonPath?: string; onBridgeSet?: (key: string, value: unknown) => void },
   ) {
     this.notebookDir = notebookDir;
+    if (opts?.pythonPath) this.pythonPath = opts.pythonPath;
     this.onBridgeSet = opts?.onBridgeSet;
   }
 
@@ -137,7 +145,9 @@ export class PythonKernel {
   async start(): Promise<void> {
     if (this._isRunning) return;
 
-    this.pythonPath = await this.discoverPython();
+    if (!this.pythonPath) {
+      this.pythonPath = await this.discoverPython();
+    }
 
     const kernelScript = join(
       dirname(new URL(import.meta.url).pathname),
@@ -436,4 +446,76 @@ export class PythonKernel {
     this.pending.clear();
     this.buffer = "";
   }
+
+  async restartWithPath(pythonPath: string): Promise<void> {
+    await this.shutdown();
+    this.pythonPath = pythonPath;
+    await this.start();
+  }
+}
+
+// ── Environment Scanner ──────────────────────────────────────────────────────
+
+async function getPythonVersion(pythonPath: string): Promise<string | undefined> {
+  try {
+    const proc = Bun.spawnSync([pythonPath, "--version"]);
+    if (proc.exitCode === 0) {
+      return proc.stdout.toString().trim().replace("Python ", "");
+    }
+  } catch {}
+  return undefined;
+}
+
+export async function scanPythonEnvironments(notebookDir: string): Promise<PythonEnv[]> {
+  const envs: PythonEnv[] = [];
+  const seen = new Set<string>();
+  const isWindows = process.platform === "win32";
+  const binDir = isWindows ? "Scripts" : "bin";
+  const pyNames = isWindows ? ["python.exe"] : ["python3", "python"];
+
+  // Scan local venvs
+  const venvDirs = [".venv", "venv"];
+  for (const venvName of venvDirs) {
+    for (const pyName of pyNames) {
+      const p = join(notebookDir, venvName, binDir, pyName);
+      if (!seen.has(p) && await Bun.file(p).exists()) {
+        seen.add(p);
+        const version = await getPythonVersion(p);
+        envs.push({ path: p, label: `${venvName} (${version ?? "unknown"})`, type: "venv", version });
+        break; // found one in this venv dir, skip fallback name
+      }
+    }
+  }
+
+  // Scan conda envs
+  const condaBase = join(process.env.HOME ?? "", "miniconda3", "envs");
+  const condaBase2 = join(process.env.HOME ?? "", "anaconda3", "envs");
+  for (const base of [condaBase, condaBase2]) {
+    try {
+      const entries = await Array.fromAsync(new Bun.Glob("*").scan({ cwd: base, onlyFiles: false }));
+      for (const name of entries) {
+        for (const pyName of pyNames) {
+          const p = join(base, name, binDir, pyName);
+          if (!seen.has(p) && await Bun.file(p).exists()) {
+            seen.add(p);
+            const version = await getPythonVersion(p);
+            envs.push({ path: p, label: `conda: ${name} (${version ?? "unknown"})`, type: "conda", version });
+            break;
+          }
+        }
+      }
+    } catch {}
+  }
+
+  // System Python
+  for (const pyName of pyNames) {
+    const p = Bun.which(pyName);
+    if (p && !seen.has(p)) {
+      seen.add(p);
+      const version = await getPythonVersion(p);
+      envs.push({ path: p, label: `System ${pyName} (${version ?? "unknown"})`, type: "system", version });
+    }
+  }
+
+  return envs;
 }

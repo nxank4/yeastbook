@@ -1,6 +1,7 @@
 // src/format.ts — .ybk / .ipynb format conversion
 
 import { extname } from "node:path";
+import { rename } from "node:fs/promises";
 
 // --- .ybk types ---
 
@@ -36,6 +37,7 @@ export interface YbkNotebook {
     dependencies?: Record<string, string>;
     packageJson?: string;
     bunLock?: string;
+    pythonPath?: string;
   };
   settings: {
     fontSize: number;
@@ -153,13 +155,14 @@ export async function loadNotebook(path: string): Promise<{ notebook: YbkNoteboo
 
 export async function saveNotebook(path: string, notebook: YbkNotebook): Promise<void> {
   const format = detectFormat(path);
+  const content = format === "ybk"
+    ? JSON.stringify(notebook, null, 2) + "\n"
+    : JSON.stringify(ybkToIpynb(notebook), null, 2) + "\n";
 
-  if (format === "ybk") {
-    await Bun.write(path, JSON.stringify(notebook, null, 2) + "\n");
-  } else {
-    const ipynb = ybkToIpynb(notebook);
-    await Bun.write(path, JSON.stringify(ipynb, null, 2) + "\n");
-  }
+  // Atomic write: write to temp file, then rename to target
+  const tmpPath = path + ".tmp";
+  await Bun.write(tmpPath, content);
+  await rename(tmpPath, path);
 }
 
 export function createEmptyYbk(): YbkNotebook {
