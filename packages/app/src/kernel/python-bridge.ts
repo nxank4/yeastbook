@@ -201,7 +201,7 @@ export class PythonKernel {
   private async readStdout() {
     if (!this.proc?.stdout) return;
 
-    const reader = this.proc.stdout.getReader();
+    const reader = (this.proc.stdout as ReadableStream<Uint8Array>).getReader();
     const decoder = new TextDecoder();
 
     try {
@@ -235,7 +235,7 @@ export class PythonKernel {
   private async readStderr() {
     if (!this.proc?.stderr) return;
 
-    const reader = this.proc.stderr.getReader();
+    const reader = (this.proc.stderr as ReadableStream<Uint8Array>).getReader();
     const decoder = new TextDecoder();
 
     try {
@@ -343,7 +343,7 @@ export class PythonKernel {
       });
 
       try {
-        this.proc!.stdin.write(request);
+        (this.proc!.stdin as import("bun").FileSink).write(request);
       } catch (err) {
         this.pending.delete(id);
         reject(new Error(`Failed to write to Python process: ${err}`));
@@ -367,7 +367,7 @@ export class PythonKernel {
       });
 
       try {
-        this.proc!.stdin.write(request);
+        (this.proc!.stdin as import("bun").FileSink).write(request);
       } catch (err) {
         this.pending.delete(id);
         reject(new Error(`Failed to push bridge data: ${err}`));
@@ -389,7 +389,7 @@ export class PythonKernel {
       });
 
       try {
-        this.proc!.stdin.write(request);
+        (this.proc!.stdin as import("bun").FileSink).write(request);
       } catch (err) {
         this.pending.delete(id);
         reject(new Error(`Failed to get bridge data: ${err}`));
@@ -412,7 +412,7 @@ export class PythonKernel {
     try {
       const id = `sh-${++this.reqCounter}`;
       const request = JSON.stringify({ id, type: "shutdown" }) + "\n";
-      this.proc.stdin.write(request);
+      (this.proc.stdin as import("bun").FileSink).write(request);
 
       // Give it 3 seconds to shut down gracefully
       const graceful = await Promise.race([

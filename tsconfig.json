@@ -25,5 +25,15 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false
-  }
+  },
+  "include": [
+    "packages/app/src/**/*",
+    "packages/core/src/**/*",
+    "tests/**/*"
+  ],
+  "exclude": [
+    "packages/ui",
+    "packages/vscode",
+    "node_modules"
+  ]
 }
