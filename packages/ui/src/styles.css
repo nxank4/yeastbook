@@ -943,6 +943,7 @@ input, textarea, select {
 
 .output-area:empty { display: none; }
 .math-output { padding: 8px 0; overflow-x: auto; }
+.vega-output { padding: 8px 0; overflow-x: auto; }
 
 /* --- Find & Replace --- */
 .find-replace-bar {
