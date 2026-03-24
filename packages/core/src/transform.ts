@@ -4,12 +4,17 @@ const STATEMENT_PREFIXES = [
   "var ", "let ", "const ", "if ", "if(", "for ", "for(",
   "while ", "while(", "do ", "do{", "class ", "function ",
   "return ", "throw ", "try ", "try{", "switch ", "switch(",
-  "import ", "export ", "{", "}", "]", ")", "//", "/*",
+  "import ", "export ", "//", "/*",
 ];
 
 function isStatement(line: string): boolean {
   const trimmed = line.trimStart();
-  return STATEMENT_PREFIXES.some((p) => trimmed.startsWith(p));
+  if (STATEMENT_PREFIXES.some((p) => trimmed.startsWith(p))) return true;
+  // Bare block-closing: only `}` or `};` (no parens/brackets = not an expression)
+  // But `})`, `}))`, `}]);` etc. are expression continuations — not statements
+  const clean = trimmed.replace(/;$/, "").trim();
+  if (/^}+$/.test(clean)) return true;  // bare closing braces only
+  return false;
 }
 
 /**
