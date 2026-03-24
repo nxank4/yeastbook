@@ -167,14 +167,133 @@ def _split_last_expr(code: str):
     return code, None
 
 
+import subprocess as _subprocess
+import os as _os
+
+# Track running child processes so SIGINT can kill them
+_active_child: _subprocess.Popen | None = None
+
+
+def _ensure_pip():
+    """Ensure pip is available, install via ensurepip if missing."""
+    check = _subprocess.run(
+        [sys.executable, "-m", "pip", "--version"],
+        capture_output=True, text=True,
+    )
+    if check.returncode != 0:
+        _subprocess.run(
+            [sys.executable, "-m", "ensurepip", "--upgrade"],
+            capture_output=True, text=True,
+        )
+
+
+def _run_subprocess_interruptible(cmd: list[str], req_id: str, timeout: int = 600) -> int:
+    """Run a subprocess that can be interrupted by SIGINT. Streams output."""
+    global _active_child
+    try:
+        proc = _subprocess.Popen(
+            cmd,
+            stdout=_subprocess.PIPE,
+            stderr=_subprocess.STDOUT,
+            text=True,
+            # Use process group so we can kill the entire tree
+            preexec_fn=_os.setsid,
+        )
+        _active_child = proc
+
+        # Stream output line by line
+        for line in iter(proc.stdout.readline, ""):
+            _write({"id": req_id, "type": "stream", "stream": "stdout", "text": line})
+
+        proc.wait(timeout=timeout)
+        return proc.returncode
+    except KeyboardInterrupt:
+        if proc and proc.poll() is None:
+            try:
+                _os.killpg(_os.getpgid(proc.pid), 9)
+            except (ProcessLookupError, PermissionError):
+                proc.kill()
+            proc.wait()
+        raise
+    finally:
+        _active_child = None
+
+
+def _handle_pip_magic(req_id: str, code: str) -> bool:
+    """Handle %pip and !pip magic commands. Supports multiple lines."""
+    lines = code.strip().splitlines()
+    # Check if ALL non-empty lines are pip magics
+    pip_lines = []
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        if line.startswith("%pip ") or line.startswith("!pip "):
+            pip_lines.append(line)
+        else:
+            return False  # Mixed content — not a pure pip magic cell
+
+    if not pip_lines:
+        return False
+
+    _ensure_pip()
+    try:
+        for line in pip_lines:
+            args = line.split(None, 1)[1] if " " in line else ""
+            cmd = [sys.executable, "-m", "pip"] + args.split()
+            returncode = _run_subprocess_interruptible(cmd, req_id)
+            if returncode != 0:
+                _write({"id": req_id, "type": "error", "ename": "PipError",
+                       "evalue": f"pip exited with code {returncode}",
+                       "traceback": [f"pip install failed (exit code {returncode})"]})
+                return True
+        _write({"id": req_id, "type": "result", "value": None})
+    except KeyboardInterrupt:
+        _write({"id": req_id, "type": "error", "ename": "KeyboardInterrupt",
+               "evalue": "Installation interrupted",
+               "traceback": ["KeyboardInterrupt: Installation interrupted"]})
+    except Exception as e:
+        _write({"id": req_id, "type": "error", "ename": type(e).__name__,
+               "evalue": str(e), "traceback": [str(e)]})
+    return True
+
+
+class _StreamWriter:
+    """Streams output to the IPC channel in real-time instead of buffering."""
+    def __init__(self, req_id: str, stream_name: str):
+        self.req_id = req_id
+        self.stream_name = stream_name
+        self.buffer = ""
+
+    def write(self, text):
+        if not text:
+            return 0
+        self.buffer += text
+        if "\n" in text or len(self.buffer) > 256:
+            self.flush()
+        return len(text)
+
+    def flush(self):
+        if self.buffer:
+            _write({"id": self.req_id, "type": "stream", "stream": self.stream_name, "text": self.buffer})
+            self.buffer = ""
+
+    def isatty(self):
+        return False
+
+
 def handle_execute(req_id: str, code: str):
     """Execute Python code in the persistent namespace."""
-    real_stdout, real_stderr = sys.stdout, sys.stderr
-    captured_out = io.StringIO()
-    captured_err = io.StringIO()
+    # Handle %pip / !pip magic before normal execution
+    if _handle_pip_magic(req_id, code):
+        return
 
-    sys.stdout = captured_out
-    sys.stderr = captured_err
+    real_stdout, real_stderr = sys.stdout, sys.stderr
+    stream_out = _StreamWriter(req_id, "stdout")
+    stream_err = _StreamWriter(req_id, "stderr")
+
+    sys.stdout = stream_out
+    sys.stderr = stream_err
 
     result_value = None
     error = None
@@ -203,18 +322,11 @@ def handle_execute(req_id: str, code: str):
             "traceback": traceback.format_exception(e),
         }
     finally:
+        # Flush remaining buffered output before restoring
+        stream_out.flush()
+        stream_err.flush()
         sys.stdout = real_stdout
         sys.stderr = real_stderr
-
-    # Send captured stdout
-    stdout_text = captured_out.getvalue()
-    if stdout_text:
-        _write({"id": req_id, "type": "stream", "name": "stdout", "text": stdout_text})
-
-    # Send captured stderr
-    stderr_text = captured_err.getvalue()
-    if stderr_text:
-        _write({"id": req_id, "type": "stream", "name": "stderr", "text": stderr_text})
 
     # Check for matplotlib figures
     for png_b64 in _check_matplotlib():
@@ -240,7 +352,17 @@ def handle_execute(req_id: str, code: str):
 # ── Signal handling ───────────────────────────────────────────────────────────
 
 def _sigint_handler(signum, frame):
-    """Raise KeyboardInterrupt to cancel running execution."""
+    """Raise KeyboardInterrupt to cancel running execution. Kill child processes first."""
+    global _active_child
+    if _active_child is not None and _active_child.poll() is None:
+        try:
+            _os.killpg(_os.getpgid(_active_child.pid), 9)
+        except (ProcessLookupError, PermissionError):
+            try:
+                _active_child.kill()
+            except Exception:
+                pass
+        _active_child = None
     raise KeyboardInterrupt("Execution interrupted")
 
 

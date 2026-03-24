@@ -411,6 +411,8 @@ export class PythonKernel {
 
   interrupt(): void {
     if (this.proc && this._isRunning) {
+      // Send SIGINT to the Python process — the kernel's signal handler
+      // will kill any active child subprocess and raise KeyboardInterrupt
       this.proc.kill("SIGINT");
     }
   }
