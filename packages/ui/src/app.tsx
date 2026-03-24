@@ -9,6 +9,7 @@ import { LeftSidebar } from "./components/LeftSidebar.tsx";
 import { PerfHUD } from "./components/PerfHUD.tsx";
 import { FindReplace } from "./components/FindReplace.tsx";
 import { PythonBootstrapModal, type BootstrapPhase } from "./components/PythonBootstrapModal.tsx";
+import { WelcomeScreen } from "./components/WelcomeScreen.tsx";
 import { useWebSocket } from "./useWebSocket.ts";
 import { useKeyboardShortcuts, type Mode } from "./hooks/useKeyboardShortcuts.ts";
 import { useHistory } from "./hooks/useHistory.ts";
@@ -37,6 +38,7 @@ export function App() {
   const [version, setVersion] = useState("");
   const [bunVersion, setBunVersion] = useState("");
   const [fileFormat, setFileFormat] = useState<"ybk" | "ipynb">("ybk");
+  const [filePath, setFilePath] = useState<string | null>(null);
   const [notebookDir, setNotebookDir] = useState("");
   const [dependencies, setDependencies] = useState<Record<string, string>>({});
   const [variables, setVariables] = useState<Record<string, { value: unknown; type: string; serializable: boolean }>>({});
@@ -61,6 +63,7 @@ export function App() {
   const [fileTreeVersion, setFileTreeVersion] = useState(0);
   const [pythonPath, setPythonPath] = useState<string | null>(null);
   const [hasVenv, setHasVenv] = useState<boolean>(false);
+  const [pythonPickerOpen, setPythonPickerOpen] = useState(false);
   const [bootstrapOpen, setBootstrapOpen] = useState(false);
   const [bootstrapPhase, setBootstrapPhase] = useState<BootstrapPhase>("choose");
   const [bootstrapLogs, setBootstrapLogs] = useState<string[]>([]);
@@ -86,9 +89,14 @@ export function App() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [saved]);
 
-  const showToast = useCallback((msg: string) => {
+  const [toastAction, setToastAction] = useState<{ label: string; action: () => void } | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  const showToast = useCallback((msg: string, action?: { label: string; action: () => void }) => {
     setToast(msg);
-    setTimeout(() => setToast(null), 1500);
+    setToastAction(action ?? null);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => { setToast(null); setToastAction(null); }, action ? 5000 : 1500);
   }, []);
 
   const cellsRef = useRef(cells);
@@ -161,6 +169,13 @@ export function App() {
     root.style.setProperty("--editor-word-wrap", settings.editor.wordWrap ? "pre-wrap" : "pre");
   }, [settings.editor]);
 
+  // Performance mode: set data attribute for CSS + localStorage
+  const performanceMode = settings.execution?.performanceMode ?? false;
+  useEffect(() => {
+    document.documentElement.setAttribute("data-perf-mode", String(performanceMode));
+    localStorage.setItem("yeastbook-perf-mode", String(performanceMode));
+  }, [performanceMode]);
+
   useEffect(() => {
     const root = document.documentElement;
     const mode = settings.layout?.maxWidth ?? "medium";
@@ -184,6 +199,7 @@ export function App() {
   }, [settings.layout?.maxWidth, settings.layout?.customWidth]);
 
   // --- WebSocket ---
+  const lastVarUpdateRef = useRef(0);
   const perfRef = useRef<{ recordPong: (ts: number) => void; recordExecStart: (id: string) => void; recordExecEnd: (id: string) => void }>({ recordPong: () => {}, recordExecStart: () => {}, recordExecEnd: () => {} });
   const handleWsMessage = useCallback((msg: WsIncoming) => {
     switch (msg.type) {
@@ -361,6 +377,12 @@ export function App() {
         setSaved(true);
         showToast("Auto-saved");
         break;
+      case "interrupt_ack":
+        showToast("Execution interrupted");
+        // Immediately clear all busy cells — don't wait for idle messages
+        setBusyCells(new Set());
+        setLiveOutputs(new Map());
+        break;
       case "files_changed":
         setFileTreeVersion((v) => v + 1);
         break;
@@ -371,10 +393,15 @@ export function App() {
         setVariables(msg.variables);
         showToast(`↩ Session restored — ${msg.restoredCount} variables recovered`);
         break;
-      case "variables_updated":
+      case "variables_updated": {
+        // In performance mode, debounce variable updates
+        const now = Date.now();
+        if (performanceMode && now - lastVarUpdateRef.current < 5000) break;
+        lastVarUpdateRef.current = now;
         setVariables(msg.variables);
         setInspectionResults(new Map());
         break;
+      }
       case "variable_details":
         setInspectionResults((prev) => new Map(prev).set(msg.name, msg.details));
         break;
@@ -436,6 +463,7 @@ export function App() {
     setCells(data.cells || []);
     if (data.fileName) setFileName(data.fileName);
     if (data.fileFormat) setFileFormat(data.fileFormat);
+    setFilePath(data.filePath ?? null);
     setNotebookLoading(false);
   }, []);
 
@@ -558,7 +586,8 @@ export function App() {
     await fetch(`/api/cells/${cellId}`, { method: "DELETE" });
     setCells((prev) => prev.filter((c) => c.id !== cellId));
     setSaved(true);
-  }, [history]);
+    showToast("Cell deleted", { label: "Undo", action: () => history.undo() });
+  }, [history, showToast]);
 
   const handleClearOutput = useCallback((cellId: string) => {
     setCells((prev) =>
@@ -827,13 +856,17 @@ export function App() {
     if (cell) {
       setClipboardCell({ ...cell });
       handleDeleteCell(cellId);
+      showToast("Cell cut");
     }
-  }, [cells, handleDeleteCell]);
+  }, [cells, handleDeleteCell, showToast]);
 
   const handleCopyCellById = useCallback((cellId: string) => {
     const cell = cells.find((c) => c.id === cellId);
-    if (cell) setClipboardCell({ ...cell });
-  }, [cells]);
+    if (cell) {
+      setClipboardCell({ ...cell });
+      showToast("Cell copied");
+    }
+  }, [cells, showToast]);
 
   const handlePasteCellBelow = useCallback(async (afterCellId: string) => {
     if (!clipboardCell) return;
@@ -854,7 +887,8 @@ export function App() {
       return [...prev, newCell];
     });
     setSaved(false);
-  }, [clipboardCell]);
+    showToast("Cell pasted");
+  }, [clipboardCell, showToast]);
 
   // --- Keyboard shortcut handlers ---
   const handleAddCellAbove = useCallback(async () => {
@@ -949,8 +983,17 @@ export function App() {
   const handleEnterEdit = useCallback(() => {
     setMode("edit");
     if (focusedCellId) {
-      const el = document.querySelector(`#cell-${focusedCellId} .monaco-editor`) as HTMLElement;
-      el?.querySelector("textarea")?.focus();
+      // Code cell: focus Monaco editor
+      const monaco = document.querySelector(`#cell-${focusedCellId} .monaco-editor`) as HTMLElement;
+      if (monaco) {
+        monaco.querySelector("textarea")?.focus();
+        return;
+      }
+      // Markdown cell: trigger double-click to enter edit mode
+      const rendered = document.querySelector(`#cell-${focusedCellId} .markdown-rendered`) as HTMLElement;
+      if (rendered) {
+        rendered.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+      }
     }
   }, [focusedCellId]);
 
@@ -999,6 +1042,13 @@ export function App() {
     loadNotebookData(data);
     showToast("New notebook created");
   }, [loadNotebookData, showToast]);
+
+  const handleCloseNotebook = useCallback(() => {
+    setCells([]);
+    setFileName("Untitled");
+    setFilePath(null);
+    setSaved(true);
+  }, []);
 
   const handleOpenFile = useCallback(async (path: string) => {
     const res = await fetch("/api/import", {
@@ -1265,6 +1315,13 @@ export function App() {
             onToggleFileExplorer={toggleSidebar}
             settings={settings}
             onUpdateSettings={handleUpdateSettings}
+            pythonPath={pythonPath}
+            onSelectPythonEnv={() => setPythonPickerOpen(true)}
+            onCreateVenv={handleCreateVenv}
+            onCloseNotebook={filePath ? handleCloseNotebook : undefined}
+            performanceMode={performanceMode}
+            onTogglePerfMode={() => handleUpdateSettings({ ...settings, execution: { ...settings.execution, performanceMode: !performanceMode } })}
+            showToast={showToast}
           />
         </>
       )}
@@ -1293,6 +1350,8 @@ export function App() {
           }}
           onOpenNotebook={handleOpenFile}
           fileTreeRefresh={fileTreeVersion}
+          performanceMode={performanceMode}
+          onSuggestPerfMode={() => handleUpdateSettings({ ...settings, execution: { ...settings.execution, performanceMode: true } })}
         />
       )}
       <FindReplace
@@ -1307,6 +1366,12 @@ export function App() {
           <p>Loading notebook...</p>
         </div>
       )}
+      {!notebookLoading && filePath === null ? (
+        <WelcomeScreen
+          onNewNotebook={handleNewNotebook}
+          onOpenExplorer={() => window.dispatchEvent(new CustomEvent("yeastbook-open-files"))}
+        />
+      ) : (
       <NotebookView
         cells={cells}
         busyCells={busyCells}
@@ -1345,10 +1410,20 @@ export function App() {
         onBlurSave={flushCellSave}
         execTiming={execTiming}
       />
+      )}
       </div>
       </Profiler>
-      {toast && settings.appearance.notifications === "show" && <div className="toast">{toast}</div>}
-      {!isPresenting && <StatusBar mode={mode} connected={connected} saved={saved} saveStatus={saveStatus} notification={settings.appearance.notifications === "minimize" ? toast : null} bunVersion={bunVersion} pythonPath={pythonPath} hasVenv={hasVenv} onCreateVenv={handleCreateVenv} onRetrySave={handleSave} />}
+      {toast && settings.appearance.notifications === "show" && (
+        <div className="toast">
+          {toast}
+          {toastAction && (
+            <button className="toast-action" onClick={() => { toastAction.action(); setToast(null); setToastAction(null); }}>
+              {toastAction.label}
+            </button>
+          )}
+        </div>
+      )}
+      {!isPresenting && <StatusBar mode={mode} connected={connected} saved={saved} saveStatus={saveStatus} notification={settings.appearance.notifications === "minimize" ? toast : null} bunVersion={bunVersion} pythonPath={pythonPath} hasVenv={hasVenv} onCreateVenv={handleCreateVenv} onRetrySave={handleSave} forceOpenPicker={pythonPickerOpen} onPickerOpened={() => setPythonPickerOpen(false)} performanceMode={performanceMode} onTogglePerfMode={() => handleUpdateSettings({ ...settings, execution: { ...settings.execution, performanceMode: !performanceMode } })} />}
       {bootstrapOpen && (
         <PythonBootstrapModal
           onClose={() => setBootstrapOpen(false)}

@@ -1,5 +1,16 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { draggable, dropTargetForElements, monitorForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
+
+function LiveTimer({ startTime }: { startTime: number }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 100);
+    return () => clearInterval(id);
+  }, []);
+  const ms = now - startTime;
+  const label = ms < 1000 ? `${ms}ms` : ms < 60000 ? `${(ms / 1000).toFixed(1)}s` : `${(ms / 60000).toFixed(1)}m`;
+  return <span className="cell-exec-time cell-exec-time-live">{label}</span>;
+}
 import { setCustomNativeDragPreview } from "@atlaskit/pragmatic-drag-and-drop/element/set-custom-native-drag-preview";
 import { attachClosestEdge, extractClosestEdge, type Edge } from "@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge";
 import { autoScrollForElements } from "@atlaskit/pragmatic-drag-and-drop-auto-scroll/element";
@@ -171,17 +182,20 @@ export function NotebookView({
         <div key={cell.id} className={`cell-wrapper ${foldedCells.has(cell.id) ? "cell-folded" : ""}`} data-type={cell.cell_type}>
           {cell.cell_type === "code" && (
             <>
-              <span className="cell-exec-count">
-                {cell.execution_count ? `[${cell.execution_count}]` : "[ ]"}
+              <span className={`cell-exec-count ${busyCells.has(cell.id) ? "cell-exec-busy" : ""}`}>
+                {busyCells.has(cell.id) ? "[*]" : cell.execution_count ? `[${cell.execution_count}]` : "[ ]"}
               </span>
               {(() => {
                 const timing = execTiming?.get(cell.id);
+                const isBusy = busyCells.has(cell.id);
+                if (isBusy && timing?.startTime) {
+                  return <LiveTimer startTime={timing.startTime} />;
+                }
                 if (!timing?.duration) return null;
                 const ms = timing.duration;
                 const label = ms < 1000 ? `${ms}ms` : ms < 60000 ? `${(ms / 1000).toFixed(1)}s` : `${(ms / 60000).toFixed(1)}m`;
                 return <span className="cell-exec-time" title={`Finished ${new Date(timing.endTime!).toLocaleTimeString()}`}>{label}</span>;
               })()}
-              {busyCells.has(cell.id) && <div className="loading-bar" />}
             </>
           )}
           <DraggableCell cellId={cell.id} index={idx} isPresenting={isPresenting}>
@@ -199,6 +213,7 @@ export function NotebookView({
                   installing={installStates.get(cell.id)}
                   isCommandFocused={mode === "command" && focusedCellId === cell.id}
                   isPresenting={isPresenting}
+                  performanceMode={settings.execution?.performanceMode}
                   dragHandleRef={dragHandleRef}
                   onModeChange={isPresenting ? () => {} : onModeChange}
                   onRun={isPresenting ? () => {} : onRunCell}
@@ -233,6 +248,7 @@ export function NotebookView({
                 <MarkdownCell
                   cell={cell}
                   isPresenting={isPresenting}
+                  isCommandFocused={mode === "command" && focusedCellId === cell.id}
                   dragHandleRef={dragHandleRef}
                   onUpdate={isPresenting ? () => {} : onUpdateMarkdown}
                   onDelete={isPresenting ? () => {} : onDeleteCell}

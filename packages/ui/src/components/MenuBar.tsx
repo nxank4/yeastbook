@@ -81,6 +81,13 @@ interface Props {
   onToggleFileExplorer: () => void;
   settings: Settings;
   onUpdateSettings: (s: Settings) => void;
+  pythonPath?: string | null;
+  onSelectPythonEnv: () => void;
+  onCreateVenv: () => void;
+  onCloseNotebook?: () => void;
+  performanceMode?: boolean;
+  onTogglePerfMode?: () => void;
+  showToast?: (msg: string) => void;
 }
 
 function CustomWidthModal({ currentWidth, onApply, onClose }: { currentWidth: number; onApply: (w: number) => void; onClose: () => void }) {
@@ -210,7 +217,14 @@ export function MenuBar(props: Props) {
     {
       label: "View",
       items: [
-        { label: "Toggle File Explorer", action: props.onToggleFileExplorer, shortcut: "Ctrl+B", icon: "bi bi-layout-sidebar-inset" },
+        { label: "Toggle Sidebar", action: props.onToggleFileExplorer, shortcut: "Ctrl+B", icon: "bi bi-layout-sidebar-inset" },
+        { label: "Sidebar Panels", icon: "bi bi-columns-gap", submenu: [
+          { label: "File Explorer", action: () => window.dispatchEvent(new CustomEvent("yeastbook-open-tab", { detail: "files" })), icon: "bi bi-files" },
+          { label: "Table of Contents", action: () => window.dispatchEvent(new CustomEvent("yeastbook-open-tab", { detail: "toc" })), icon: "bi bi-list-nested" },
+          { label: "Variables", action: () => window.dispatchEvent(new CustomEvent("yeastbook-open-tab", { detail: "variables" })), icon: "bi bi-braces" },
+          { label: "Resources", action: () => window.dispatchEvent(new CustomEvent("yeastbook-open-tab", { detail: "resources" })), icon: "bi bi-speedometer2" },
+          { label: "Environment", action: () => window.dispatchEvent(new CustomEvent("yeastbook-open-tab", { detail: "env" })), icon: "bi bi-key" },
+        ]},
         { separator: true },
         { label: "Presentation Mode", action: props.onTogglePresentation, shortcut: "Ctrl+Shift+E", icon: "bi bi-easel" },
         { separator: true },
@@ -220,6 +234,8 @@ export function MenuBar(props: Props) {
         { label: "Font Size: Decrease", action: props.onFontSizeDecrease, icon: "bi bi-zoom-out" },
         { label: "Word Wrap: Toggle", action: props.onToggleWordWrap, icon: "bi bi-text-wrap" },
         { separator: true },
+        { label: "Performance Mode", action: () => props.onTogglePerfMode?.(), icon: "bi bi-lightning-charge-fill", checked: !!props.performanceMode },
+        { separator: true },
         { label: "Cell Size", icon: "bi bi-arrows", submenu: [
           { label: "Small (800px)", action: () => setWidth("small"), checked: currentWidth === "small" },
           { label: "Medium (1100px)", action: () => setWidth("medium"), checked: currentWidth === "medium" },
@@ -227,6 +243,15 @@ export function MenuBar(props: Props) {
           { separator: true },
           { label: `Custom${currentWidth === "custom" ? ` (${props.settings.layout?.customWidth ?? 1100}px)` : ""}...`, action: () => setCustomWidthInput(true), checked: currentWidth === "custom" },
         ]},
+      ],
+    },
+    {
+      label: "Runtime",
+      items: [
+        { label: props.pythonPath ? `Python: ${props.pythonPath.includes(".venv") ? ".venv" : props.pythonPath.includes("venv") ? "venv" : props.pythonPath.includes("conda") ? "conda" : "system"}` : "No Python configured", action: () => {}, disabled: true, icon: "bi bi-filetype-py" },
+        { separator: true },
+        { label: "Change Python Environment...", action: props.onSelectPythonEnv, icon: "bi bi-arrow-left-right" },
+        { label: "Create Virtual Environment...", action: props.onCreateVenv, icon: "bi bi-plus-circle" },
       ],
     },
     {
@@ -261,7 +286,8 @@ export function MenuBar(props: Props) {
     }
     navigator.clipboard.writeText(parts.join("\n\n"));
     closeAll();
-  }, [props.cells, closeAll]);
+    props.showToast?.("Copied to clipboard");
+  }, [props.cells, closeAll, props.showToast]);
 
   return (
     <>
@@ -326,7 +352,7 @@ export function MenuBar(props: Props) {
               onClick={() => setOpenMenu(openMenu === "_copy" ? null : "_copy")}
               title="Copy notebook content"
             >
-              <i className="bi bi-clipboard" /> Copy
+              <i className="bi bi-clipboard" /> Copy All
             </button>
             {openMenu === "_copy" && (
               <div className="menu-dropdown">
@@ -344,12 +370,36 @@ export function MenuBar(props: Props) {
           </div>
           <button
             className="menubar-action-btn"
+            onClick={props.onRunCell}
+            disabled={!props.focusedCellId}
+            title="Run Cell (Shift+Enter)"
+          >
+            <i className="bi bi-play-fill" /> Run
+          </button>
+          <button
+            className="menubar-action-btn"
             onClick={() => { props.onRunAll(); }}
             disabled={props.runningAll}
             title="Run All Cells"
           >
             <i className="bi bi-fast-forward-fill" /> Run All
           </button>
+          <button
+            className="menubar-action-btn"
+            onClick={props.onRestart}
+            title="Restart Kernel"
+          >
+            <i className="bi bi-arrow-repeat" /> Restart
+          </button>
+          {props.onCloseNotebook && (
+            <button
+              className="menubar-action-btn"
+              onClick={props.onCloseNotebook}
+              title="Close Notebook"
+            >
+              <i className="bi bi-x-circle" /> Close
+            </button>
+          )}
         </div>
       </div>
       {showOpenFile && (

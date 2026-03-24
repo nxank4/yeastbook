@@ -24,6 +24,8 @@ interface Props {
   onScrollToCell: (cellId: string) => void;
   onOpenNotebook: (path: string) => void;
   fileTreeRefresh: number;
+  performanceMode?: boolean;
+  onSuggestPerfMode?: () => void;
 }
 
 type TabId = "files" | "toc" | "variables" | "resources" | "env";
@@ -48,10 +50,11 @@ function getStoredExpanded(): boolean {
 
 export function LeftSidebar({
   cells, variables, dependencies, inspectionResults, onInspectVariable,
-  onScrollToCell, onOpenNotebook, fileTreeRefresh,
+  onScrollToCell, onOpenNotebook, fileTreeRefresh, performanceMode, onSuggestPerfMode,
 }: Props) {
   const [activeTab, setActiveTab] = useState<TabId>(getStoredTab);
   const [expanded, setExpanded] = useState(getStoredExpanded);
+  const [glowing, setGlowing] = useState(false);
 
   const tocEntries = useTableOfContents(cells);
   const cellIds = useMemo(() => cells.map((c) => c.id), [cells]);
@@ -67,7 +70,37 @@ export function LeftSidebar({
       });
     };
     window.addEventListener("yeastbook-toggle-sidebar", handler);
-    return () => window.removeEventListener("yeastbook-toggle-sidebar", handler);
+
+    // Force-open to files tab (e.g., from welcome screen)
+    const openFilesHandler = () => {
+      setActiveTab("files");
+      setExpanded(true);
+      localStorage.setItem("yeastbook-sidebar-expanded", "true");
+      localStorage.setItem("yeastbook-sidebar-tab", "files");
+      setGlowing(true);
+      setTimeout(() => setGlowing(false), 1500);
+    };
+    window.addEventListener("yeastbook-open-files", openFilesHandler);
+
+    // Open a specific sidebar tab by name
+    const openTabHandler = (e: Event) => {
+      const tabId = (e as CustomEvent).detail as TabId;
+      if (TABS.some((t) => t.id === tabId)) {
+        setActiveTab(tabId);
+        setExpanded(true);
+        localStorage.setItem("yeastbook-sidebar-expanded", "true");
+        localStorage.setItem("yeastbook-sidebar-tab", tabId);
+        setGlowing(true);
+        setTimeout(() => setGlowing(false), 1500);
+      }
+    };
+    window.addEventListener("yeastbook-open-tab", openTabHandler);
+
+    return () => {
+      window.removeEventListener("yeastbook-toggle-sidebar", handler);
+      window.removeEventListener("yeastbook-open-files", openFilesHandler);
+      window.removeEventListener("yeastbook-open-tab", openTabHandler);
+    };
   }, []);
 
   const handleTabClick = useCallback((tabId: TabId) => {
@@ -102,7 +135,7 @@ export function LeftSidebar({
         ))}
       </div>
       {expanded && (
-        <div className="left-sidebar-panel">
+        <div className={`left-sidebar-panel ${glowing ? "sidebar-glow" : ""}`}>
           {activeTab === "files" && (
             <FileExplorer
               onOpenNotebook={onOpenNotebook}
@@ -148,7 +181,7 @@ export function LeftSidebar({
                 </button>
               </div>
               <div className="left-sidebar-scroll">
-                <ResourceMonitor />
+                <ResourceMonitor performanceMode={performanceMode} onSuggestPerfMode={onSuggestPerfMode} />
               </div>
             </>
           )}
