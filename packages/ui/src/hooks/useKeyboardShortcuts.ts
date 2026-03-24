@@ -21,6 +21,7 @@ interface ShortcutHandlers {
   onOpenPalette: () => void;
   onTogglePresentation: () => void;
   onInterrupt: () => void;
+  onToggleLanguage?: () => void;
   onUndo: () => void;
   onRedo: () => void;
   onToggleFileExplorer: () => void;
@@ -105,6 +106,7 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
         }
         case "m": e.preventDefault(); h.onChangeCellType("markdown"); break;
         case "y": e.preventDefault(); h.onChangeCellType("code"); break;
+        case "l": e.preventDefault(); h.onToggleLanguage?.(); break;
         case "ArrowUp": case "k": e.preventDefault(); h.onFocusPrev(); break;
         case "ArrowDown": case "j": e.preventDefault(); h.onFocusNext(); break;
         case "Enter":

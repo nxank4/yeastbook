@@ -24,6 +24,7 @@ interface ParsedArgs {
   ipynb: boolean;
   dev: boolean;
   template: string | null;
+  dir: string | null;
 }
 
 function parseFlags(argv: string[]): ParsedArgs {
@@ -33,6 +34,7 @@ function parseFlags(argv: string[]): ParsedArgs {
   let ipynb = false;
   let dev = false;
   let template: string | null = null;
+  let dir: string | null = null;
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -59,12 +61,18 @@ function parseFlags(argv: string[]): ParsedArgs {
         template = next;
         i++;
       }
+    } else if (arg === "--dir") {
+      const next = argv[i + 1];
+      if (next !== undefined && !next.startsWith("-")) {
+        dir = next;
+        i++;
+      }
     } else {
       positional.push(arg!);
     }
   }
 
-  return { positional, port, noOpen, ipynb, dev, template };
+  return { positional, port, noOpen, ipynb, dev, template, dir };
 }
 
 // ---------------------------------------------------------------------------
@@ -101,12 +109,13 @@ function printUsage(): void {
   console.log("  --no-open         Do not open browser after starting server");
   console.log("  --ipynb           Use .ipynb format (with `new` command)");
   console.log("  --template <name> Use a template (with `new` command)");
+  console.log("  --dir <path>      Directory for new notebooks (default: cwd)");
   console.log("  --dev             Dev mode: serve from dist/, watch for UI changes");
 }
 
 const DEV_NOTEBOOK_FILE = resolve(".yeastbook-dev-notebook");
 
-async function promptDevNotebook(): Promise<string | null> {
+async function promptDevNotebook(searchDir: string = process.cwd()): Promise<string | null> {
   // On --watch restart, reuse the previously chosen notebook
   try {
     const saved = await Bun.file(DEV_NOTEBOOK_FILE).text();
@@ -116,10 +125,10 @@ async function promptDevNotebook(): Promise<string | null> {
     }
   } catch {}
 
-  const notebooks = await listNotebooks(process.cwd());
+  const notebooks = await listNotebooks(searchDir);
   if (notebooks.length === 0) return null;
 
-  console.log("\nExisting notebooks in current directory:");
+  console.log(`\nExisting notebooks in ${searchDir}:`);
   notebooks.forEach((nb, i) => {
     const size = (nb.size / 1024).toFixed(1);
     console.log(`  ${i + 1}. ${nb.name} (${size} KB)`);
@@ -272,8 +281,13 @@ async function handlePlugin(subArgs: string[]): Promise<void> {
 // Main dispatch
 // ---------------------------------------------------------------------------
 
-const { positional, port, noOpen, ipynb, dev, template } = parseFlags(process.argv.slice(2));
+const { positional, port, noOpen, ipynb, dev, template, dir } = parseFlags(process.argv.slice(2));
 const command = positional[0];
+
+if (command === "help" || process.argv.includes("--help") || process.argv.includes("-h")) {
+  printUsage();
+  process.exit(0);
+}
 
 // stdin mode for git filter (strip-notebook-outputs)
 if (process.argv.includes("--stdin")) {
@@ -290,22 +304,26 @@ if (process.argv.includes("--stdin")) {
 }
 
 if (!command || command === "new") {
+  const targetDir = dir ? resolve(dir) : process.cwd();
+  if (dir) {
+    await mkdir(targetDir, { recursive: true });
+  }
   await checkWritePermission();
 
   let filePath: string;
   if (dev) {
-    const existing = await promptDevNotebook();
+    const existing = await promptDevNotebook(targetDir);
     if (existing) {
       filePath = existing;
       console.log(`Opening notebook: ${filePath}`);
     } else {
       const ext = ipynb ? ".ipynb" : ".ybk";
-      filePath = resolve(`notebook-${Date.now()}${ext}`);
+      filePath = resolve(targetDir, `notebook-${Date.now()}${ext}`);
       console.log(`Creating new notebook: ${filePath}`);
     }
   } else {
     const ext = ipynb ? ".ipynb" : ".ybk";
-    filePath = resolve(`notebook-${Date.now()}${ext}`);
+    filePath = resolve(targetDir, `notebook-${Date.now()}${ext}`);
     console.log(`Creating new notebook: ${filePath}`);
   }
 

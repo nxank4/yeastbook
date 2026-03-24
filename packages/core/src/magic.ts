@@ -6,13 +6,27 @@ export type MagicCommand =
   | { type: "timeit"; runs: number; code: string }
   | { type: "time"; code: string };
 
+export type CellMagic = { type: "python" };
+
 export interface ParseResult {
   magic: MagicCommand[];
   cleanCode: string;
+  cellMagic?: CellMagic;
 }
 
 export function parseMagicCommands(code: string): ParseResult {
   const lines = code.split("\n");
+
+  // Check for cell-level magic (must be first non-empty line)
+  const firstNonEmptyIdx = lines.findIndex((l) => l.trim().length > 0);
+  if (firstNonEmptyIdx !== -1 && lines[firstNonEmptyIdx]!.trim() === "%%python") {
+    return {
+      magic: [],
+      cleanCode: lines.slice(firstNonEmptyIdx + 1).join("\n").trim(),
+      cellMagic: { type: "python" },
+    };
+  }
+
   const magic: MagicCommand[] = [];
   const cleanLines: string[] = [];
 

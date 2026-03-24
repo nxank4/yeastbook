@@ -8,6 +8,7 @@ import { assets } from "./assets.ts";
 import { executeCode, interruptExecution } from "./kernel/execute.ts";
 import { installPackages } from "./kernel/installer.ts";
 import { serializeContext, saveSnapshot, loadSnapshot, clearSnapshot } from "./kernel/snapshot.ts";
+import { PythonKernel, YeastBridge } from "./kernel/python-bridge.ts";
 import type { SessionSnapshot } from "./kernel/snapshot.ts";
 import { watchNotebook, createOwnWriteMarker } from "./watcher.ts";
 import { PluginLoader } from "./plugins/loader.ts";
@@ -127,6 +128,8 @@ interface ServerState {
   filePath: string;
   executionCount: number;
   context: Record<string, unknown>;
+  pythonKernel: PythonKernel | null;
+  yeastBridge: YeastBridge;
 }
 
 function hasDistDir(): boolean {
@@ -182,12 +185,19 @@ export async function startServer(filePath: string, port: number = 3000, devMode
   }
   await reloadEnv();
 
+  const yeastBridge = new YeastBridge();
+
   const state: ServerState = {
     notebook,
     filePath: absPath,
     executionCount: 0,
     context: {},
+    pythonKernel: null,
+    yeastBridge,
   };
+
+  // Inject YeastBridge into execution context so TS cells can use yb.push/get
+  state.context.yb = yeastBridge;
 
   // Restore session snapshot if available
   let lastSnapshotVars: Record<string, { value: unknown; type: string; serializable: boolean }> = {};
@@ -299,7 +309,10 @@ export async function startServer(filePath: string, port: number = 3000, devMode
         }
         const asset = assets[url.pathname];
         if (asset) {
-          return new Response(asset.content, {
+          const body = asset.binary
+            ? Uint8Array.from(atob(asset.content), (c) => c.charCodeAt(0))
+            : asset.content;
+          return new Response(body, {
             headers: { "Content-Type": asset.mimeType },
           });
         }
@@ -345,12 +358,15 @@ export async function startServer(filePath: string, port: number = 3000, devMode
           return Response.json({ ok: true });
         },
         PATCH: async (req) => {
-          const body = await req.json() as { source?: string; cell_type?: "code" | "markdown" };
+          const body = await req.json() as { source?: string; cell_type?: "code" | "markdown"; metadata?: Record<string, unknown> };
           if (body.source !== undefined) {
             state.notebook.updateCellSource(req.params.id, body.source);
           }
           if (body.cell_type) {
             state.notebook.updateCellType(req.params.id, body.cell_type);
+          }
+          if (body.metadata) {
+            state.notebook.updateCellMetadata(req.params.id, body.metadata);
           }
           ownWriteMarker.mark();
           await state.notebook.save(state.filePath);
@@ -395,10 +411,22 @@ export async function startServer(filePath: string, port: number = 3000, devMode
       },
       "/api/restart": {
         POST: async () => {
+          // Shutdown Python kernel if running
+          if (state.pythonKernel) {
+            await state.pythonKernel.shutdown();
+            state.pythonKernel = null;
+          }
+          state.yeastBridge._clear();
+          state.yeastBridge._setKernel(null);
+
           state.context = {};
           state.executionCount = 0;
           lastSnapshotVars = {};
           await clearSnapshot(state.filePath);
+
+          // Re-inject yeastBridge into fresh context
+          state.context.yb = state.yeastBridge;
+
           for (const c of clients) {
             c.send(JSON.stringify({ type: "variables_updated", variables: {} }));
           }
@@ -465,36 +493,6 @@ export async function startServer(filePath: string, port: number = 3000, devMode
           return Response.json({ id });
         },
       },
-      "/api/ai/generate": {
-        POST: async (req) => {
-          const body = await req.json() as { prompt: string; context: string[]; mode: "generate" | "fix"; code?: string; error?: string };
-          const aiSettings = settings.ai;
-          if (!aiSettings || aiSettings.provider === "disabled" || !aiSettings.apiKey) {
-            return new Response("AI not configured", { status: 400 });
-          }
-          const { buildPrompt, buildFixPrompt, streamAI } = await import("./ai.ts");
-          const { system, user } = body.mode === "fix"
-            ? buildFixPrompt(body.code ?? "", body.error ?? "")
-            : buildPrompt(body.prompt, body.context);
-
-          const stream = new ReadableStream({
-            async start(controller) {
-              try {
-                for await (const chunk of streamAI(aiSettings.provider as any, aiSettings.apiKey, system, user)) {
-                  controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ text: chunk })}\n\n`));
-                }
-                controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
-              } catch (e) {
-                controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ error: String(e) })}\n\n`));
-              }
-              controller.close();
-            },
-          });
-          return new Response(stream, {
-            headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
-          });
-        },
-      },
       "/api/settings": {
         GET: async () => {
           const pkg = await Bun.file(resolve(import.meta.dirname!, "../package.json")).json();
@@ -522,6 +520,58 @@ export async function startServer(filePath: string, port: number = 3000, devMode
       },
       "/api/env": {
         GET: async () => Response.json({ keys: envKeys }),
+      },
+      "/api/env/info": {
+        GET: async () => {
+          const notebookDir = dirname(state.filePath);
+          const hasVenv = existsSync(join(notebookDir, ".venv")) || existsSync(join(notebookDir, "venv"));
+          const isWindows = process.platform === "win32";
+          const binDir = isWindows ? "Scripts" : "bin";
+          const pyName = isWindows ? "python.exe" : "python3";
+          let pythonPath: string | null = null;
+          if (state.pythonKernel?.detectedPythonPath) {
+            pythonPath = state.pythonKernel.detectedPythonPath;
+          } else {
+            const candidates = [
+              join(notebookDir, ".venv", binDir, pyName),
+              join(notebookDir, "venv", binDir, pyName),
+            ];
+            for (const c of candidates) {
+              if (existsSync(c)) { pythonPath = c; break; }
+            }
+            if (!pythonPath) {
+              try {
+                const which = Bun.spawnSync(["which", "python3"]);
+                if (which.exitCode === 0) pythonPath = which.stdout.toString().trim();
+              } catch {}
+            }
+          }
+          return Response.json({
+            bunVersion: Bun.version,
+            pythonPath: pythonPath ? relative(notebookDir, pythonPath) || pythonPath : null,
+            hasVenv,
+          });
+        },
+      },
+      "/api/env/create-venv": {
+        POST: async () => {
+          const notebookDir = dirname(state.filePath);
+          const venvPath = join(notebookDir, ".venv");
+          if (existsSync(venvPath)) {
+            return Response.json({ success: true, message: "venv already exists" });
+          }
+          const proc = Bun.spawn(["python3", "-m", "venv", ".venv"], {
+            cwd: notebookDir,
+            stdout: "pipe",
+            stderr: "pipe",
+          });
+          const exitCode = await proc.exited;
+          if (exitCode !== 0) {
+            const stderr = await new Response(proc.stderr).text();
+            return Response.json({ success: false, error: stderr.trim() }, { status: 500 });
+          }
+          return Response.json({ success: true, path: venvPath });
+        },
       },
       "/api/env/reload": {
         POST: async () => {
@@ -713,12 +763,19 @@ declare function createSelect(config: { options: string[]; value?: string; label
             variables: lastSnapshotVars,
           }));
         }
+        // Notify client of Python availability
+        if (state.pythonKernel?.isRunning) {
+          ws.send(JSON.stringify({
+            type: "python_status", status: "available",
+            pythonPath: state.pythonKernel.detectedPythonPath,
+          }));
+        }
       },
       close(ws) { clients.delete(ws); },
       async message(ws, message) {
         try {
           const msg = JSON.parse(message as string) as
-            | { type: "execute"; cellId: string; code: string }
+            | { type: "execute"; cellId: string; code: string; language?: string }
             | { type: "interrupt" }
             | { type: "ping"; ts: number };
 
@@ -729,7 +786,117 @@ declare function createSelect(config: { options: string[]; value?: string; label
 
           if (msg.type === "execute") {
             // Parse magic commands
-            const { magic, cleanCode } = parseMagicCommands(msg.code);
+            const { magic, cleanCode, cellMagic } = parseMagicCommands(msg.code);
+
+            // ── Python cell routing ──────────────────────────────────────
+            // Determine language: explicit from WS message, fallback to %%python magic for legacy
+            const language = msg.language || (cellMagic?.type === "python" ? "python" : "typescript");
+
+            if (language === "python") {
+              // Use cleanCode if %%python magic was detected (strip the magic line)
+              // Otherwise use the full code as-is (language from metadata, no magic to strip)
+              const pythonCode = cellMagic?.type === "python" ? cleanCode : msg.code;
+              ws.send(JSON.stringify({ type: "status", cellId: msg.cellId, status: "busy" }));
+
+              try {
+                // Lazy-start Python kernel
+                if (!state.pythonKernel) {
+                  state.pythonKernel = new PythonKernel(dirname(state.filePath), {
+                    onBridgeSet: (key, value) => {
+                      state.yeastBridge._onBridgeSet(key, value);
+                    },
+                  });
+                  state.yeastBridge._setKernel(state.pythonKernel);
+                }
+
+                if (!state.pythonKernel.isRunning) {
+                  ws.send(JSON.stringify({ type: "python_status", status: "starting" }));
+                  await state.pythonKernel.start();
+                  ws.send(JSON.stringify({
+                    type: "python_status", status: "available",
+                    pythonPath: state.pythonKernel.detectedPythonPath,
+                  }));
+                }
+
+                state.executionCount++;
+                state.notebook.updateCellSource(msg.cellId, msg.code);
+
+                const pyResult = await state.pythonKernel.execute(pythonCode, (streamMsg) => {
+                  if (streamMsg.type === "stream") {
+                    ws.send(JSON.stringify({
+                      type: "stream", cellId: msg.cellId,
+                      name: streamMsg.name, text: streamMsg.text,
+                    }));
+                  } else if (streamMsg.type === "mime") {
+                    ws.send(JSON.stringify({
+                      type: "result", cellId: msg.cellId,
+                      value: "", executionCount: state.executionCount,
+                      richOutput: { type: "mime", mime: streamMsg.mime, data: streamMsg.data },
+                    }));
+                  }
+                });
+
+                // MIME outputs already streamed via onStream callback above
+
+                if (pyResult.error) {
+                  ws.send(JSON.stringify({
+                    type: "error", cellId: msg.cellId,
+                    ename: pyResult.error.ename, evalue: pyResult.error.evalue,
+                    traceback: pyResult.error.traceback,
+                  }));
+                } else if (pyResult.value !== null) {
+                  ws.send(JSON.stringify({
+                    type: "result", cellId: msg.cellId,
+                    value: pyResult.value,
+                    executionCount: state.executionCount,
+                  }));
+                }
+
+                // Save cell output
+                state.notebook.setCellOutput(msg.cellId, state.executionCount, {
+                  value: pyResult.value ?? undefined,
+                  stdout: pyResult.stdout,
+                  stderr: pyResult.stderr,
+                  error: pyResult.error,
+                });
+
+              } catch (err) {
+                const error = err instanceof Error ? err : new Error(String(err));
+                ws.send(JSON.stringify({
+                  type: "error", cellId: msg.cellId,
+                  ename: error.constructor.name, evalue: error.message,
+                  traceback: (error.stack ?? "").split("\n"),
+                }));
+
+                // If Python not found, notify UI
+                if (error.message.includes("Python not found")) {
+                  ws.send(JSON.stringify({ type: "python_status", status: "unavailable" }));
+                }
+              }
+
+              ws.send(JSON.stringify({
+                type: "status", cellId: msg.cellId, status: "idle",
+                executionCount: state.executionCount,
+              }));
+
+              ownWriteMarker.mark();
+              await state.notebook.save(state.filePath);
+              scheduleAutoSave();
+
+              // Save session snapshot & broadcast variables
+              const vars = serializeContext(state.context);
+              lastSnapshotVars = vars;
+              await saveSnapshot(state.filePath, {
+                notebookPath: state.filePath,
+                savedAt: new Date().toISOString(),
+                executionCount: state.executionCount,
+                variables: vars,
+              });
+              for (const client of clients) {
+                client.send(JSON.stringify({ type: "variables_updated", variables: vars }));
+              }
+              return;
+            }
 
             // Send busy status upfront (needed for both magic-only and code cells)
             if (magic.length > 0 || cleanCode.trim()) {
@@ -944,6 +1111,7 @@ declare function createSelect(config: { options: string[]; value?: string; label
             }
           } else if (msg.type === "interrupt") {
             interruptExecution();
+            state.pythonKernel?.interrupt();
           }
         } catch (err) {
           // Catch-all: never let a bad message crash the server

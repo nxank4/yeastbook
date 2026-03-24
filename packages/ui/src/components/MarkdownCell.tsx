@@ -81,10 +81,12 @@ export function MarkdownCell({ cell, isPresenting, onUpdate, onDelete, onMoveUp,
     { id: "add-code", label: "Add Code Cell Below", icon: "bi bi-plus-square", onClick: () => onInsertBelow?.("code") },
     { id: "add-md", label: "Add Markdown Below", icon: "bi bi-markdown", onClick: () => onInsertBelow?.("markdown") },
     { id: "sep3", label: "", separator: true },
-    { id: "delete", label: "Delete Cell", icon: "bi bi-trash3", danger: true, onClick: () => onDelete(cell.id) },
+    { id: "to-code", label: "Change to Code", icon: "bi bi-code-slash", shortcut: "Y", onClick: onChangeType },
     { id: "sep4", label: "", separator: true },
+    { id: "delete", label: "Delete Cell", icon: "bi bi-trash3", danger: true, onClick: () => onDelete(cell.id) },
+    { id: "sep5", label: "", separator: true },
     { id: "native", label: "Show Native Menu", icon: "bi bi-window", onClick: showNativeMenu },
-  ], [editing, onCopy, onMoveUp, onMoveDown, onInsertBelow, onDelete, cell.id, showNativeMenu]);
+  ], [editing, onCopy, onMoveUp, onMoveDown, onInsertBelow, onChangeType, onDelete, cell.id, showNativeMenu]);
 
   // Content is sanitized via DOMPurify before being set as innerHTML
   const sanitizedHtml = source.trim()

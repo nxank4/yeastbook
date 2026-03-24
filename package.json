@@ -6,7 +6,7 @@
   "workspaces": ["packages/*"],
   "scripts": {
     "dev": "bun run dev:ui & bun run dev:server",
-    "dev:server": "bun --watch packages/app/src/cli.ts new --dev",
+    "dev:server": "bun --watch packages/app/src/cli.ts new --dev --dir demos",
     "dev:ui": "mkdir -p packages/ui/dist && cp packages/ui/src/index.html packages/ui/dist/index.html && bun build packages/ui/src/index.tsx --outdir packages/ui/dist --bundle --watch",
     "build:ui": "bun run --filter @yeastbook/ui build",
     "build:embed": "bun run scripts/embed-assets.ts",

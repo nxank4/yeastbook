@@ -40,6 +40,11 @@ interface Props {
   dragHandleRef?: React.RefObject<HTMLDivElement | null>;
   onSave?: () => void;
   onOpenPalette?: () => void;
+  onEditorMount?: (cellId: string, editor: any, monaco: any) => void;
+  onSelectAcrossCells?: (searchText: string) => void;
+  isFolded?: boolean;
+  onToggleFold?: (cellId: string) => void;
+  onChangeLanguage?: (cellId: string, language: string) => void;
 }
 
 export function CodeCell({
@@ -47,17 +52,17 @@ export function CodeCell({
   installing, isCommandFocused, isPresenting, onModeChange, onRun, onRunAndAdvance, onSourceChange, onDelete, onClear, onMoveUp, onMoveDown,
   onRunAllAbove, onRunAllBelow, onInterrupt, onChangeType,
   onRunAll, onCut, onCopy, onPasteBelow, hasClipboard, onInsertAbove, onInsertBelow, onHistoryPush, dragHandleRef,
-  onSave, onOpenPalette,
+  onSave, onOpenPalette, onEditorMount, onSelectAcrossCells, isFolded, onToggleFold, onChangeLanguage,
 }: Props) {
   const editorRef = useRef<any>(null);
   const monacoRef = useRef<any>(null);
   const [editorHeight, setEditorHeight] = useState(60);
-  const [aiPromptOpen, setAiPromptOpen] = useState(false);
-  const [aiPrompt, setAiPrompt] = useState("");
-  const [aiLoading, setAiLoading] = useState(false);
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; zone: "cell" | "output" } | null>(null);
   const sourceRef = useRef(cell.source.join("\n"));
   const historyBeforeRef = useRef(cell.source.join("\n"));
+
+  // Detect Python cell from metadata
+  const isPythonCell = cell.metadata?.language === "python";
   const historyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Refs for callbacks and cell ID to avoid stale closures in Monaco commands
   const cellIdRef = useRef(cell.id);
@@ -72,6 +77,8 @@ export function CodeCell({
   onOpenPaletteRef.current = onOpenPalette;
   const isPresentingRef = useRef(isPresenting);
   isPresentingRef.current = isPresenting;
+  const onSelectAcrossCellsRef = useRef(onSelectAcrossCells);
+  onSelectAcrossCellsRef.current = onSelectAcrossCells;
   const markerDisposableRef = useRef<any>(null);
 
   const updateHeight = useCallback(() => {
@@ -356,6 +363,7 @@ export function CodeCell({
   const handleEditorMount: OnMount = useCallback((editor, monaco) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
+    onEditorMount?.(cell.id, editor, monaco);
 
     // Load Bun type definitions with fallback
     const addBunTypes = (dts: string, uri: string) => {
@@ -407,6 +415,17 @@ export function CodeCell({
           e.stopImmediatePropagation();
           e.preventDefault();
           onOpenPaletteRef.current?.();
+          return;
+        }
+        // Ctrl/Cmd+Shift+D → select across all cells
+        if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "d" || e.key === "D")) {
+          e.stopImmediatePropagation();
+          e.preventDefault();
+          const selection = editor.getSelection();
+          const selectedText = selection ? editor.getModel()?.getValueInRange(selection) : "";
+          if (selectedText) {
+            onSelectAcrossCellsRef.current?.(selectedText);
+          }
           return;
         }
         // Escape → exit to command mode (only when no Monaco overlay is open)
@@ -503,48 +522,6 @@ export function CodeCell({
   }, [cell.id]);
 
 
-  const handleAiGenerate = useCallback(async () => {
-    if (!aiPrompt.trim()) return;
-    setAiLoading(true);
-    try {
-      const res = await fetch("/api/ai/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: aiPrompt, context: [], mode: "generate" }),
-      });
-      const reader = res.body!.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let code = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-        for (const line of lines) {
-          if (line.startsWith("data: ") && line !== "data: [DONE]") {
-            try {
-              const parsed = JSON.parse(line.slice(6));
-              if (parsed.text) {
-                code += parsed.text;
-                editorRef.current?.setValue(code);
-              }
-            } catch {}
-          }
-        }
-      }
-      sourceRef.current = code;
-      onSourceChange(cell.id, code);
-    } catch (e) {
-      console.error("AI generation failed:", e);
-    } finally {
-      setAiLoading(false);
-      setAiPromptOpen(false);
-      setAiPrompt("");
-    }
-  }, [aiPrompt, cell.id, onSourceChange]);
-
   const displayOutputs = liveOutputs.length > 0 ? liveOutputs : cell.outputs;
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
@@ -616,20 +593,27 @@ export function CodeCell({
       { id: "add-code-below", label: "Add Code Cell Below", icon: "bi bi-plus-square", onClick: () => onInsertBelow?.("code") },
       { id: "add-md-below", label: "Add Markdown Below", icon: "bi bi-markdown", onClick: () => onInsertBelow?.("markdown") },
       { id: "sep4", label: "", separator: true },
+      { id: "to-markdown", label: "Change to Markdown", icon: "bi bi-markdown", shortcut: "M", onClick: onChangeType },
+      { id: "lang-toggle", label: isPythonCell ? "Change to TypeScript" : "Change to Python", icon: isPythonCell ? "bi bi-filetype-tsx" : "bi bi-filetype-py", shortcut: "L", onClick: () => onChangeLanguage?.(cell.id, isPythonCell ? "typescript" : "python") },
+      { id: "sep5", label: "", separator: true },
       { id: "clear", label: "Clear Output", icon: "bi bi-eraser", onClick: () => onClear(cell.id) },
       { id: "delete", label: "Delete Cell", icon: "bi bi-trash3", danger: true, onClick: () => onDelete(cell.id) },
-      { id: "sep5", label: "", separator: true },
-      { id: "ai", label: "Ask AI", icon: "bi bi-stars", onClick: () => setAiPromptOpen(true) },
       { id: "sep6", label: "", separator: true },
       { id: "native", label: "Show Native Menu", icon: "bi bi-window", onClick: showNativeMenu },
     ];
-  }, [ctxMenu, cell.id, displayOutputs, onRun, onRunAll, onCut, onCopy, onPasteBelow, hasClipboard, onMoveUp, onMoveDown, onInsertAbove, onInsertBelow, onClear, onDelete, showNativeMenu]);
+  }, [ctxMenu, cell.id, displayOutputs, onRun, onRunAll, onCut, onCopy, onPasteBelow, hasClipboard, onMoveUp, onMoveDown, onInsertAbove, onInsertBelow, onClear, onDelete, onChangeType, onChangeLanguage, isPythonCell, showNativeMenu]);
 
   return (
     <div className={`cell code-cell ${isCommandFocused ? "command-focused" : ""}`} id={`cell-${cell.id}`} onContextMenu={handleContextMenu}>
       <div className="cell-header">
         <div ref={dragHandleRef} className="cell-drag-handle" title="Drag to reorder"><i className="bi bi-grip-vertical" /></div>
+        <button className="cell-fold-btn" onClick={(e) => { e.stopPropagation(); onToggleFold?.(cell.id); }} title={isFolded ? "Expand cell" : "Collapse cell"}>
+          <i className={`bi ${isFolded ? "bi-chevron-right" : "bi-chevron-down"}`} />
+        </button>
         <button className="cell-type cell-type-toggle" onClick={(e) => { e.stopPropagation(); onChangeType?.(); }} title="Switch to markdown (M)">code</button>
+        <button className={`cell-lang-badge ${isPythonCell ? "cell-lang-python" : "cell-lang-ts"}`} onClick={(e) => { e.stopPropagation(); onChangeLanguage?.(cell.id, isPythonCell ? "typescript" : "python"); }} title={isPythonCell ? "Switch to TypeScript (T)" : "Switch to Python (P)"}>
+          <i className={isPythonCell ? "bi bi-filetype-py" : "bi bi-filetype-tsx"} />{isPythonCell ? " Python" : " TypeScript"}
+        </button>
         <div className="cell-actions">
           {onMoveUp && <button onClick={(e) => { e.stopPropagation(); onMoveUp(); }} title="Move up"><i className="bi bi-arrow-up" /></button>}
           {onMoveDown && <button onClick={(e) => { e.stopPropagation(); onMoveDown(); }} title="Move down"><i className="bi bi-arrow-down" /></button>}
@@ -639,32 +623,21 @@ export function CodeCell({
           <button className="run-btn" onClick={(e) => { e.stopPropagation(); onRunAllBelow?.(); }} title="Run all from here">
             <i className="bi bi-skip-end-fill" />
           </button>
-          <button onClick={(e) => { e.stopPropagation(); setAiPromptOpen(!aiPromptOpen); }} title="Ask AI"><i className="bi bi-stars" /></button>
           <button onClick={(e) => { e.stopPropagation(); onDelete(cell.id); }} title="Delete cell"><i className="bi bi-trash3" /></button>
         </div>
       </div>
-      {aiPromptOpen && (
-        <div className="ai-prompt-bar">
-          <input
-            type="text"
-            value={aiPrompt}
-            onChange={(e) => setAiPrompt(e.target.value)}
-            placeholder="What should this code do?"
-            className="ai-prompt-input"
-            onKeyDown={(e) => { if (e.key === "Enter") handleAiGenerate(); if (e.key === "Escape") setAiPromptOpen(false); }}
-          />
-          <button onClick={handleAiGenerate} disabled={aiLoading} className="ai-generate-btn">
-            {aiLoading ? "Generating..." : "Generate"}
-          </button>
-          <button onClick={() => setAiPromptOpen(false)} className="ai-cancel-btn">Cancel</button>
+      {isFolded ? (
+        <div className="cell-fold-summary" onClick={() => onToggleFold?.(cell.id)}>
+          <span className="cell-fold-preview">{(cell.source[0] || "// empty cell").slice(0, 80)}{(cell.source[0]?.length ?? 0) > 80 ? "..." : ""}</span>
+          {cell.source.length > 1 && <span className="cell-fold-lines"> ({cell.source.length} lines)</span>}
         </div>
-      )}
+      ) : (
       <div className="code-area">
         <Editor
           height={editorHeight}
-          defaultLanguage="typescript"
+          defaultLanguage={isPythonCell ? "python" : "typescript"}
           defaultValue={cell.source.join("\n") || ""}
-          path={`cell-${cell.id}.ts`}
+          path={`cell-${cell.id}.${isPythonCell ? "py" : "ts"}`}
           theme={theme === "dark" ? "yeastbook-dark" : "yeastbook-light"}
           beforeMount={handleBeforeMount}
           onMount={handleEditorMount}
@@ -689,10 +662,12 @@ export function CodeCell({
             dragAndDrop: false,
             contextmenu: false,
             fixedOverflowWidgets: true,
+            multiCursorModifier: "alt",
           }}
         />
       </div>
-      {(displayOutputs.length > 0 || installing) && (
+      )}
+      {!isFolded && (displayOutputs.length > 0 || installing) && (
         <div className="output-section">
           <div className="output-actions">
             <button onClick={(e) => { e.stopPropagation(); onClear(cell.id); }} title="Clear output"><i className="bi bi-eraser" /></button>
@@ -700,7 +675,10 @@ export function CodeCell({
           {installing && (
             <div className="output-area">
               {!installing.done && (
-                <div className="output-stdout"><span className="busy-indicator" /> Installing {installing.packages.join(", ")}...</div>
+                <div className="output-stdout">
+                  <div className="loading-bar" />
+                  Installing {installing.packages.join(", ")}...
+                </div>
               )}
               {installing.logs.length > 0 && (
                 <div className="output-stdout">{installing.logs.join("")}</div>

@@ -112,3 +112,5 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). PRs welcome!
 ## License
 
 [MIT](LICENSE) — Made by [CodePawl](https://github.com/nxank4)
+
+Built with [Claude Code](https://claude.com/claude-code) as coding assistant.

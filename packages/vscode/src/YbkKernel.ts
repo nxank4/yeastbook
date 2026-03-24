@@ -49,7 +49,7 @@ export class YbkKernel {
       "yeastbook",
       "Bun Kernel",
     );
-    this.controller.supportedLanguages = ["typescript", "javascript"];
+    this.controller.supportedLanguages = ["typescript", "javascript", "python"];
     this.controller.supportsExecutionOrder = true;
     this.controller.executeHandler = this.executeHandler.bind(this);
     this.controller.interruptHandler = this.interruptHandler.bind(this);
@@ -92,14 +92,16 @@ export class YbkKernel {
     await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
-        title: "Starting Bun Kernel...",
+        title: "Starting Bun Kernel",
         cancellable: false,
       },
-      async () => {
+      async (progress) => {
+        progress.report({ increment: 0, message: "Finding port..." });
         const config = vscode.workspace.getConfiguration("yeastbook");
         const configPort = config.get<number>("serverPort", 0);
         this.port = configPort || await this.findFreePort();
 
+        progress.report({ increment: 20, message: "Resolving CLI..." });
         const bunPath = config.get<string>("bunPath", "bun");
         const cliPath = this.findYeastbook();
         if (!cliPath) {
@@ -107,6 +109,7 @@ export class YbkKernel {
           throw new Error("yeastbook CLI not found. Install: bun install -g yeastbook");
         }
 
+        progress.report({ increment: 10, message: "Spawning server..." });
         this.output.appendLine(`Starting server: ${bunPath} ${cliPath} ${notebookPath} --port ${this.port}`);
 
         this.process = spawn(bunPath, [cliPath, notebookPath, "--port", String(this.port), "--no-open"], {
@@ -143,7 +146,9 @@ export class YbkKernel {
           });
         });
 
+        progress.report({ increment: 30, message: "Connecting WebSocket..." });
         await this.connectWebSocket();
+        progress.report({ increment: 40, message: "Connected" });
         this.output.appendLine("Server started and WebSocket connected.");
         this.setStatus("idle");
       },

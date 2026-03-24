@@ -73,8 +73,10 @@ export const DEFAULT_SETTINGS: Settings = {
   layout: { maxWidth: "medium", sidebar: false },
 };
 
+export type CellLanguage = "typescript" | "python";
+
 export type WsOutgoing =
-  | { type: "execute"; cellId: string; code: string }
+  | { type: "execute"; cellId: string; code: string; language?: CellLanguage }
   | { type: "interrupt" };
 
 // WebSocket message types
@@ -93,4 +95,5 @@ export type WsIncoming =
   | { type: "dependencies_updated"; dependencies: Record<string, string> }
   | { type: "snapshot_restored"; restoredCount: number; variables: Record<string, { value: unknown; type: string; serializable: boolean }> }
   | { type: "variables_updated"; variables: Record<string, { value: unknown; type: string; serializable: boolean }> }
-  | { type: "pong"; ts: number };
+  | { type: "pong"; ts: number }
+  | { type: "python_status"; status: "available" | "unavailable" | "starting"; pythonPath?: string };

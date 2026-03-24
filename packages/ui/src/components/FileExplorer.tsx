@@ -16,6 +16,56 @@ interface Props {
   refreshTrigger: number;
 }
 
+function InputDialog({ title, placeholder, onSubmit, onClose }: { title: string; placeholder?: string; onSubmit: (value: string) => void; onClose: () => void }) {
+  const [value, setValue] = useState("");
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 360 }}>
+        <div className="modal-header">
+          <h2>{title}</h2>
+          <button className="settings-close" onClick={onClose}><i className="bi bi-x-lg" /></button>
+        </div>
+        <div style={{ padding: "16px 20px" }}>
+          <input
+            type="text"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && value.trim()) onSubmit(value.trim()); if (e.key === "Escape") onClose(); }}
+            placeholder={placeholder}
+            className="widget-text-input"
+            style={{ width: "100%", fontSize: 14, padding: "6px 10px" }}
+            autoFocus
+          />
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
+            <button className="ai-cancel-btn" onClick={onClose}>Cancel</button>
+            <button className="ai-generate-btn" onClick={() => value.trim() && onSubmit(value.trim())} disabled={!value.trim()}>Create</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ConfirmDialog({ message, onConfirm, onClose }: { message: string; onConfirm: () => void; onClose: () => void }) {
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 360 }}>
+        <div className="modal-header">
+          <h2>Confirm</h2>
+          <button className="settings-close" onClick={onClose}><i className="bi bi-x-lg" /></button>
+        </div>
+        <div style={{ padding: "16px 20px" }}>
+          <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: 0 }}>{message}</p>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
+            <button className="ai-cancel-btn" onClick={onClose}>Cancel</button>
+            <button className="dialog-danger-btn" onClick={onConfirm} autoFocus>Delete</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const FILE_ICONS: Record<string, string> = {
   ".ybk": "\u{1F4D3}", ".ipynb": "\u{1F4D3}",
   ".ts": "\u{1F4D8}", ".tsx": "\u{1F4D8}",
@@ -225,21 +275,33 @@ export function FileExplorer({ onOpenNotebook, onClose, refreshTrigger }: Props)
     }
   }, [apiCall]);
 
-  const handleDelete = useCallback(async (path: string, name: string) => {
-    if (!confirm(`Delete "${name}"?`)) return;
-    await apiCall("/api/files/delete", { path });
-    if (selectedPath === path) { setSelectedPath(null); setPreviewPath(null); }
-  }, [apiCall, selectedPath]);
+  const [deleteDialog, setDeleteDialog] = useState<{ path: string; name: string } | null>(null);
+  const [createDialog, setCreateDialog] = useState<{ parentPath: string; type: "file" | "directory" } | null>(null);
 
-  const handleCreate = useCallback(async (parentPath: string, type: "file" | "directory") => {
-    const name = prompt(`New ${type} name:`);
-    if (!name?.trim()) return;
-    const path = parentPath ? `${parentPath}/${name.trim()}` : name.trim();
-    await apiCall("/api/files/create", { path, type });
-    if (type === "directory") {
-      setExpandedDirs((prev) => new Set(prev).add(parentPath));
+  const handleDelete = useCallback((path: string, name: string) => {
+    setDeleteDialog({ path, name });
+  }, []);
+
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!deleteDialog) return;
+    await apiCall("/api/files/delete", { path: deleteDialog.path });
+    if (selectedPath === deleteDialog.path) { setSelectedPath(null); setPreviewPath(null); }
+    setDeleteDialog(null);
+  }, [apiCall, selectedPath, deleteDialog]);
+
+  const handleCreate = useCallback((parentPath: string, type: "file" | "directory") => {
+    setCreateDialog({ parentPath, type });
+  }, []);
+
+  const handleCreateSubmit = useCallback(async (name: string) => {
+    if (!createDialog) return;
+    const path = createDialog.parentPath ? `${createDialog.parentPath}/${name}` : name;
+    await apiCall("/api/files/create", { path, type: createDialog.type });
+    if (createDialog.type === "directory") {
+      setExpandedDirs((prev) => new Set(prev).add(createDialog.parentPath));
     }
-  }, [apiCall]);
+    setCreateDialog(null);
+  }, [apiCall, createDialog]);
 
   const handleDuplicate = useCallback(async (path: string) => {
     await apiCall("/api/files/duplicate", { path });
@@ -356,6 +418,21 @@ export function FileExplorer({ onOpenNotebook, onClose, refreshTrigger }: Props)
           y={contextMenu.y}
           items={getContextMenuItems(contextMenu.node)}
           onClose={() => setContextMenu(null)}
+        />
+      )}
+      {createDialog && (
+        <InputDialog
+          title={`New ${createDialog.type === "directory" ? "Folder" : "File"}`}
+          placeholder={createDialog.type === "directory" ? "folder-name" : "filename.ts"}
+          onSubmit={handleCreateSubmit}
+          onClose={() => setCreateDialog(null)}
+        />
+      )}
+      {deleteDialog && (
+        <ConfirmDialog
+          message={`Are you sure you want to delete "${deleteDialog.name}"? This cannot be undone.`}
+          onConfirm={handleDeleteConfirm}
+          onClose={() => setDeleteDialog(null)}
         />
       )}
     </>

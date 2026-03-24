@@ -38,6 +38,21 @@ export class Notebook {
       kernelspec: { name: "yeastbook", display_name: "Yeastbook (Bun)", language: "typescript" },
       language_info: { name: "typescript" },
     };
+
+    // Migrate legacy %%python cells to metadata-based language
+    for (const cell of this.cells) {
+      if (cell.cell_type === "code" && !cell.metadata?.language) {
+        const src = cell.source.join("\n").trimStart();
+        if (src.startsWith("%%python")) {
+          cell.metadata = { ...cell.metadata, language: "python" };
+          const lines = cell.source.join("\n").split("\n");
+          const idx = lines.findIndex((l) => l.trim() === "%%python");
+          if (idx !== -1) {
+            cell.source = [lines.slice(idx + 1).join("\n")];
+          }
+        }
+      }
+    }
   }
 
   static createEmpty(): Notebook {
@@ -106,6 +121,11 @@ export class Notebook {
   updateCellSource(id: string, source: string): void {
     const cell = this.cells.find((c) => c.id === id);
     if (cell) cell.source = [source];
+  }
+
+  updateCellMetadata(id: string, updates: Record<string, unknown>): void {
+    const cell = this.cells.find((c) => c.id === id);
+    if (cell) cell.metadata = { ...cell.metadata, ...updates };
   }
 
   updateCellType(id: string, type: "code" | "markdown"): void {

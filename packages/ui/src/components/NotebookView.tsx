@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { draggable, dropTargetForElements, monitorForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { setCustomNativeDragPreview } from "@atlaskit/pragmatic-drag-and-drop/element/set-custom-native-drag-preview";
 import { attachClosestEdge, extractClosestEdge, type Edge } from "@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge";
@@ -29,6 +29,7 @@ interface Props {
   onRunAllBelow: (cellId: string) => void;
   onInterrupt: () => void;
   onChangeCellType: (type: "code" | "markdown", cellId: string) => void;
+  onChangeLanguage?: (cellId: string, language: string) => void;
   onInsertCellAt: (type: "code" | "markdown", position: "above" | "below", targetCellId: string) => void;
   onCutCell: (cellId: string) => void;
   onCopyCell: (cellId: string) => void;
@@ -39,6 +40,8 @@ interface Props {
   onReorderCell: (cellId: string, toIndex: number) => void;
   onSave: () => void;
   onOpenPalette: () => void;
+  onEditorMount?: (cellId: string, editor: any, monaco: any) => void;
+  onSelectAcrossCells?: (searchText: string) => void;
 }
 
 function DraggableCell({ cellId, index, children, isPresenting }: {
@@ -106,10 +109,21 @@ export function NotebookView({
   cells, busyCells, liveOutputs, settings, installStates,
   mode, focusedCellId, isPresenting, onModeChange,
   onRunCell, onRunAndAdvance, onSourceChange, onDeleteCell, onClearOutput, onUpdateMarkdown, onAddCell, onMoveCell,
-  onRunAllAbove, onRunAllBelow, onInterrupt, onChangeCellType,
+  onRunAllAbove, onRunAllBelow, onInterrupt, onChangeCellType, onChangeLanguage,
   onInsertCellAt, onCutCell, onCopyCell, onPasteCellBelow, hasClipboard, onRunAll, onHistoryPush, onReorderCell,
-  onSave, onOpenPalette,
+  onSave, onOpenPalette, onEditorMount, onSelectAcrossCells,
 }: Props) {
+  const [foldedCells, setFoldedCells] = useState<Set<string>>(new Set());
+
+  const toggleFold = useCallback((cellId: string) => {
+    setFoldedCells((prev) => {
+      const next = new Set(prev);
+      if (next.has(cellId)) next.delete(cellId);
+      else next.add(cellId);
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
     return monitorForElements({
       onDrop({ source, location }) {
@@ -137,12 +151,14 @@ export function NotebookView({
   return (
     <div className={`notebook ${isPresenting ? "presentation-mode" : ""}`}>
       {cells.map((cell, idx) => (
-        <div key={cell.id} className="cell-wrapper" data-type={cell.cell_type}>
+        <div key={cell.id} className={`cell-wrapper ${foldedCells.has(cell.id) ? "cell-folded" : ""}`} data-type={cell.cell_type}>
           {cell.cell_type === "code" && (
-            <span className="cell-exec-count">
-              {busyCells.has(cell.id) && <span className="busy-indicator" />}
-              {cell.execution_count ? `[${cell.execution_count}]` : "[ ]"}
-            </span>
+            <>
+              <span className="cell-exec-count">
+                {cell.execution_count ? `[${cell.execution_count}]` : "[ ]"}
+              </span>
+              {busyCells.has(cell.id) && <div className="loading-bar" />}
+            </>
           )}
           <DraggableCell cellId={cell.id} index={idx} isPresenting={isPresenting}>
           {(dragHandleRef) =>
@@ -172,6 +188,7 @@ export function NotebookView({
                   onRunAllBelow={isPresenting ? () => {} : () => onRunAllBelow(cell.id)}
                   onInterrupt={isPresenting ? () => {} : onInterrupt}
                   onChangeType={isPresenting ? () => {} : () => onChangeCellType("markdown", cell.id)}
+                  onChangeLanguage={isPresenting ? undefined : onChangeLanguage}
                   onHistoryPush={onHistoryPush}
                   onRunAll={isPresenting ? () => {} : onRunAll}
                   onSave={onSave}
@@ -182,6 +199,10 @@ export function NotebookView({
                   hasClipboard={hasClipboard}
                   onInsertAbove={isPresenting ? () => {} : (type) => onInsertCellAt(type, "above", cell.id)}
                   onInsertBelow={isPresenting ? () => {} : (type) => onInsertCellAt(type, "below", cell.id)}
+                  onEditorMount={onEditorMount}
+                  onSelectAcrossCells={onSelectAcrossCells}
+                  isFolded={foldedCells.has(cell.id)}
+                  onToggleFold={toggleFold}
                 />
               ) : (
                 <MarkdownCell

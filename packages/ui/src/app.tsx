@@ -52,9 +52,12 @@ export function App() {
   );
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(true);
   const [fileTreeVersion, setFileTreeVersion] = useState(0);
+  const [pythonPath, setPythonPath] = useState<string | null>(null);
+  const [hasVenv, setHasVenv] = useState<boolean>(false);
   const runAllResolveRef = useRef<((hadError: boolean) => void) | null>(null);
   const runAllCellErrorRef = useRef(false);
   const runAllAbortedRef = useRef(false);
+  const editorRefsMap = useRef<Map<string, { editor: any; monaco: any }>>(new Map());
 
   useEffect(() => {
     document.title = `${saved ? "" : "● "}${fileName} — Yeastbook`;
@@ -87,6 +90,13 @@ export function App() {
         if (data.version) setVersion(data.version);
         if (data.bunVersion) setBunVersion(data.bunVersion);
       });
+    fetch("/api/env/info")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.pythonPath) setPythonPath(data.pythonPath);
+        setHasVenv(data.hasVenv ?? false);
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -321,6 +331,13 @@ export function App() {
       case "variables_updated":
         setVariables(msg.variables);
         break;
+      case "python_status":
+        if (msg.status === "available" && msg.pythonPath) {
+          setPythonPath(msg.pythonPath);
+        } else if (msg.status === "unavailable") {
+          setPythonPath(null);
+        }
+        break;
     }
   }, [showToast]);
 
@@ -358,10 +375,56 @@ export function App() {
       });
       setSaved(false);
       perfRef.current.recordExecStart(cellId);
-      send({ type: "execute", cellId, code });
+      // Send cell language from metadata so server can route to correct kernel
+      const cell = cellsRef.current.find((c) => c.id === cellId);
+      const language = cell?.metadata?.language as string | undefined;
+      send({ type: "execute", cellId, code, ...(language ? { language } : {}) });
     },
     [send]
   );
+
+  const handleCreateVenv = useCallback(async () => {
+    showToast("Creating virtual environment...");
+    try {
+      const res = await fetch("/api/env/create-venv", { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        showToast("Virtual environment created");
+        setHasVenv(true);
+        // Refresh env info to get python path
+        const info = await fetch("/api/env/info").then((r) => r.json());
+        if (info.pythonPath) setPythonPath(info.pythonPath);
+        setHasVenv(info.hasVenv ?? true);
+      } else {
+        showToast(`Failed: ${data.error}`);
+      }
+    } catch {
+      showToast("Failed to create virtual environment");
+    }
+  }, [showToast]);
+
+  const handleEditorMount = useCallback((cellId: string, editor: any, monaco: any) => {
+    editorRefsMap.current.set(cellId, { editor, monaco });
+    // Clean up on dispose
+    editor.onDidDispose(() => {
+      editorRefsMap.current.delete(cellId);
+    });
+  }, []);
+
+  const handleSelectAcrossCells = useCallback((searchText: string) => {
+    for (const [, { editor, monaco }] of editorRefsMap.current) {
+      const model = editor.getModel();
+      if (!model) continue;
+      const matches = model.findMatches(searchText, true, false, true, null, true);
+      if (matches.length > 0) {
+        const selections = matches.map((m: any) => new monaco.Selection(
+          m.range.startLineNumber, m.range.startColumn,
+          m.range.endLineNumber, m.range.endColumn,
+        ));
+        editor.setSelections(selections);
+      }
+    }
+  }, []);
 
   const focusCellEditor = useCallback((targetCellId: string) => {
     setFocusedCellId(targetCellId);
@@ -742,6 +805,17 @@ export function App() {
     });
   }, [focusedCellId, history]);
 
+  const handleChangeLanguage = useCallback(async (cellId: string, language: string) => {
+    setCells((prev) => prev.map((c) =>
+      c.id === cellId ? { ...c, metadata: { ...c.metadata, language } } : c
+    ));
+    await fetch(`/api/cells/${cellId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ metadata: { language } }),
+    });
+  }, []);
+
   const handleEnterEdit = useCallback(() => {
     setMode("edit");
     if (focusedCellId) {
@@ -963,6 +1037,12 @@ export function App() {
     onOpenPalette: () => setPaletteOpen(true),
     onTogglePresentation: togglePresentation,
     onInterrupt: handleInterrupt,
+    onToggleLanguage: () => {
+      if (!focusedCellId) return;
+      const cell = cellsRef.current.find((c) => c.id === focusedCellId);
+      const current = cell?.metadata?.language as string | undefined;
+      handleChangeLanguage(focusedCellId, current === "python" ? "typescript" : "python");
+    },
     onUndo: history.undo,
     onRedo: history.redo,
     onToggleFileExplorer: () => setLeftSidebarOpen((p) => !p),
@@ -980,7 +1060,7 @@ export function App() {
       ) : (
         <>
           <div className="toolbar">
-            <span className="toolbar-logo">🍞 yeastbook</span>
+            <span className="toolbar-logo"><img src="./favicon.png" alt="" width="26" height="26" style={{ verticalAlign: "middle", marginRight: 6 }} />yeastbook</span>
             <EditableFileName fileName={fileName} onRename={handleRename} />
             <span style={{ flex: 1 }} />
             <button onClick={togglePresentation} className="toolbar-btn present-btn" title="Presentation mode (Ctrl+Shift+E)">
@@ -1080,6 +1160,7 @@ export function App() {
         onRunAllBelow={handleRunAllBelow}
         onInterrupt={handleInterrupt}
         onChangeCellType={handleChangeCellType}
+        onChangeLanguage={handleChangeLanguage}
         onInsertCellAt={handleInsertCellAt}
         onCutCell={handleCutCellById}
         onCopyCell={handleCopyCellById}
@@ -1090,6 +1171,8 @@ export function App() {
         onReorderCell={handleReorderCell}
         onSave={handleSave}
         onOpenPalette={() => setPaletteOpen(true)}
+        onEditorMount={handleEditorMount}
+        onSelectAcrossCells={handleSelectAcrossCells}
       />
       {settings.layout?.sidebar && !isPresenting && (
         <div className="notebook-sidebar">
@@ -1101,7 +1184,7 @@ export function App() {
       </div>
       </Profiler>
       {toast && settings.appearance.notifications === "show" && <div className="toast">{toast}</div>}
-      {!isPresenting && <StatusBar mode={mode} connected={connected} saved={saved} notification={settings.appearance.notifications === "minimize" ? toast : null} />}
+      {!isPresenting && <StatusBar mode={mode} connected={connected} saved={saved} notification={settings.appearance.notifications === "minimize" ? toast : null} bunVersion={bunVersion} pythonPath={pythonPath} hasVenv={hasVenv} onCreateVenv={handleCreateVenv} />}
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} commands={paletteCommands} />
       {debugEnabled && <PerfHUD metrics={perfMetrics.metrics} />}
     </>

@@ -123,16 +123,8 @@
       "id": "lr-06-evaluate",
       "type": "code",
       "source": "// Cell 6: Evaluate on training data\nconst yPred = model.predict(X_norm)\nconst mse = model.mse(y, yPred)\nconst rmse = Math.sqrt(mse)\nconst mae = y.reduce((sum, yi, i) => sum + Math.abs(yi - yPred[i]!), 0) / y.length\n\nconst yMean = y.reduce((a, b) => a + b) / y.length\nconst ssTot = y.reduce((sum, yi) => sum + Math.pow(yi - yMean, 2), 0)\nconst ssRes = y.reduce((sum, yi, i) => sum + Math.pow(yi - yPred[i]!, 2), 0)\nconst r2 = 1 - ssRes / ssTot\n\nconsole.log(\"=== Model Performance ===\")\nconsole.log(`RMSE: $${Math.round(rmse).toLocaleString()}`)\nconsole.log(`MAE:  $${Math.round(mae).toLocaleString()}`)\nconsole.log(`R²:   ${r2.toFixed(4)} (${(r2 * 100).toFixed(1)}% variance explained)`)\nconsole.log(\"\\nModel weights:\", model.weights.map(w => w.toFixed(2)))\nconsole.log(\"Bias:\", model.bias.toFixed(0))",
-      "outputs": [
-        {
-          "output_type": "stream",
-          "name": "stdout",
-          "text": [
-            "=== Model Performance ===\nRMSE: $10,386\nMAE:  $9,429\nR²:   0.9936 (99.4% variance explained)\n\nModel weights: [ \"105609.49\", \"24549.82\", \"675.38\" ]\nBias: 340000\n"
-          ]
-        }
-      ],
-      "executionCount": 10
+      "outputs": [],
+      "executionCount": null
     },
     {
       "id": "lr-07-compare",
