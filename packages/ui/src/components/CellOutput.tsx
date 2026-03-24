@@ -5,6 +5,7 @@ import { HtmlOutput } from "./outputs/HtmlOutput.tsx";
 import { PluginRenderer } from "./outputs/PluginRenderer.tsx";
 import { MimeOutput } from "./outputs/MimeOutput.tsx";
 import { MathOutput } from "./outputs/MathOutput.tsx";
+import { VegaOutput } from "./outputs/VegaOutput.tsx";
 import { SliderWidget } from "./widgets/SliderWidget.tsx";
 import { InputWidget } from "./widgets/InputWidget.tsx";
 import { ToggleWidget } from "./widgets/ToggleWidget.tsx";
@@ -69,6 +70,8 @@ function RichOutputRenderer({ output }: { output: NonNullable<CellOutputType["ri
       return <JsonTree data={output.data} />;
     case "math":
       return <MathOutput latex={(output as any).latex} displayMode={(output as any).displayMode} />;
+    case "vega":
+      return <VegaOutput spec={(output as any).spec} />;
     case "text":
       return <div className="output-result">{output.text}</div>;
     case "plugin":

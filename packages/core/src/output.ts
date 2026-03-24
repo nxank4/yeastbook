@@ -38,6 +38,9 @@ export function detectOutputType(value: unknown): OutputData | null {
     if (v.__type === "math" && typeof v.latex === "string") {
       return { type: "math", latex: v.latex, displayMode: v.displayMode !== false } as any;
     }
+    if (v.__type === "vega" && isPlainObject(v.spec)) {
+      return { type: "vega", spec: v.spec } as any;
+    }
   }
 
   // Check for MIME output
