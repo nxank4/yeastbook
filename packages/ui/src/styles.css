@@ -945,6 +945,41 @@ input, textarea, select {
 .math-output { padding: 8px 0; overflow-x: auto; }
 .vega-output { padding: 8px 0; overflow-x: auto; }
 
+/* --- DataFrame Viewer --- */
+.dataframe-viewer { font-size: 12px; }
+.dataframe-toolbar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 0; border-bottom: 1px solid var(--border-light);
+}
+.dataframe-filter {
+  flex: 1; padding: 3px 8px; border: 1px solid var(--border-subtle);
+  border-radius: 6px; background: var(--bg-app); color: var(--text-primary);
+  font-size: 12px; outline: none; font-family: 'Inter', sans-serif;
+}
+.dataframe-filter:focus { border-color: var(--accent); }
+.dataframe-info { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+.dataframe-index { color: var(--text-muted); font-size: 10px; min-width: 30px; text-align: right; }
+.dataframe-col-type {
+  display: inline-block; margin-left: 4px; font-size: 9px;
+  padding: 0 4px; border-radius: 3px; vertical-align: middle;
+  background: var(--bg-toolbar); color: var(--text-muted);
+}
+.type-num { color: var(--accent-blue); }
+.type-bool { color: #d97706; }
+.type-str { color: var(--status-success); }
+.dataframe-col-name { font-weight: 600; }
+.dataframe-null { color: var(--text-muted); font-style: italic; }
+.dataframe-pagination {
+  display: flex; align-items: center; justify-content: center;
+  gap: 8px; padding: 6px 0; font-size: 11px; color: var(--text-muted);
+}
+.dataframe-pagination button {
+  background: none; border: 1px solid var(--border-subtle); border-radius: 4px;
+  color: var(--text-secondary); cursor: pointer; padding: 2px 8px; font-size: 12px;
+}
+.dataframe-pagination button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.dataframe-pagination button:disabled { opacity: 0.3; cursor: default; }
+
 /* --- Find & Replace --- */
 .find-replace-bar {
   position: sticky; top: 80px; z-index: 20;

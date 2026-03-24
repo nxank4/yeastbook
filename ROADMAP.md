@@ -40,7 +40,7 @@ Core execution engine, Monaco editor, rich output (charts, tables, JSON trees), 
 - [x] Session export/restore (snapshot persistence)
 
 **Output**
-- [ ] Interactive DataFrame viewer
+- [x] Interactive DataFrame viewer
 - [x] Vega/Vega-Lite chart support
 - [ ] LaTeX/KaTeX math rendering
 
