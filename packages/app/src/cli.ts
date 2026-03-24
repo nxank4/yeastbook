@@ -90,6 +90,37 @@ async function checkWritePermission(): Promise<void> {
   }
 }
 
+async function autoInstallDeps(notebookPath: string): Promise<void> {
+  try {
+    const content = await Bun.file(notebookPath).text();
+    const notebook = JSON.parse(content);
+    const deps = notebook.metadata?.dependencies;
+    if (!deps || Object.keys(deps).length === 0) return;
+
+    const missing: string[] = [];
+    for (const pkg of Object.keys(deps)) {
+      try {
+        require.resolve(pkg);
+      } catch {
+        missing.push(`${pkg}@${deps[pkg]}`);
+      }
+    }
+
+    if (missing.length > 0) {
+      console.log(`\x1b[36m📦 Installing ${missing.length} missing dependencies...\x1b[0m`);
+      const proc = Bun.spawn(["bun", "add", ...missing], { stdout: "inherit", stderr: "inherit" });
+      await proc.exited;
+      if (proc.exitCode === 0) {
+        console.log(`\x1b[32m✓ Dependencies ready\x1b[0m`);
+      } else {
+        console.error(`\x1b[33m⚠ Some dependencies failed to install\x1b[0m`);
+      }
+    }
+  } catch {
+    // Not a valid notebook or no deps — skip silently
+  }
+}
+
 function printUsage(): void {
   console.log("Usage:");
   console.log("  yeastbook new [--ipynb] [--template <name>] [--port <n>] [--no-open]");
@@ -339,6 +370,7 @@ if (!command || command === "new") {
     console.log(`Using template: ${template}`);
   }
 
+  await autoInstallDeps(filePath);
   const actualPort = await findFreePort(port);
   const server = await startServer(filePath, actualPort, dev);
   console.log(`Yeastbook running at http://localhost:${server.port}`);
@@ -502,6 +534,7 @@ if (!command || command === "new") {
   // Open existing notebook by path
   await checkWritePermission();
   const filePath = resolve(command);
+  await autoInstallDeps(filePath);
   const actualPort = await findFreePort(port);
   const server = await startServer(filePath, actualPort, dev);
   console.log(`Yeastbook running at http://localhost:${server.port}`);
