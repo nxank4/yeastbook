@@ -20,9 +20,9 @@ Core execution engine, Monaco editor, rich output (charts, tables, JSON trees), 
 - [x] `bunx yeastbook file.ybk` installs deps + runs in one step
 
 **Readable Diff Mode** — Git-friendly notebook format
-- [ ] `.ybk.md` split-save: code & markdown in plain Markdown, outputs in sidecar JSON
-- [ ] Clean diffs on GitHub — reviewable without opening Yeastbook
-- [ ] Round-trip: open `.ybk.md` back in Yeastbook with full output restore
+- [x] `.ybk.md` split-save: code & markdown in plain Markdown, outputs in sidecar JSON
+- [x] Clean diffs on GitHub — reviewable without opening Yeastbook
+- [x] Round-trip: open `.ybk.md` back in Yeastbook with full output restore
 
 **SQL Cells** — Native data exploration powered by `bun:sqlite`
 - [ ] `%sql` cell type with syntax highlighting

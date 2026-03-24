@@ -14,3 +14,4 @@ export { detectMimeOutput } from "./mime.ts";
 export type { MimeOutput } from "./mime.ts";
 export { createSlider, createInput, createToggle, createSelect } from "./widgets.ts";
 export type { Widget } from "./widgets.ts";
+export { notebookToMarkdown, markdownToNotebook, extractOutputs } from "./ybk-md.ts";

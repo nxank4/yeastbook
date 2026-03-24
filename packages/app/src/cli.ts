@@ -151,6 +151,8 @@ function printUsage(): void {
   console.log("  yeastbook diff <file> [--staged] [--commit <ref>]   Show notebook diff");
   console.log("  yeastbook diff <old.ybk> <new.ybk>                  Diff two notebooks");
   console.log("  yeastbook diff-text <file>                           Dump notebook as readable text");
+  console.log("  yeastbook export-md <file.ybk>                       Convert .ybk → .ybk.md (readable)");
+  console.log("  yeastbook import-md <file.ybk.md>                   Convert .ybk.md → .ybk");
   console.log("  yeastbook doctor                                     Check system requirements");
   console.log("");
   console.log("Options:");
@@ -420,6 +422,43 @@ if (!command || command === "new") {
   const destPath = join(dirname(srcPath), basename(srcPath, ".ipynb") + ".ybk");
   await Bun.write(destPath, JSON.stringify(ybk, null, 2) + "\n");
   console.log(`Imported: ${srcPath} → ${destPath}`);
+} else if (command === "export-md") {
+  const { notebookToMarkdown, extractOutputs } = await import("@codepawl/yeastbook-core");
+  const srcPath = resolve(positional[1] ?? "");
+  if (!srcPath || !srcPath.endsWith(".ybk")) {
+    console.error("Usage: yeastbook export-md <file.ybk>");
+    process.exit(1);
+  }
+  const ybk = await Bun.file(srcPath).json();
+  const md = notebookToMarkdown(ybk);
+  const outputs = extractOutputs(ybk);
+  const mdPath = srcPath.replace(/\.ybk$/, ".ybk.md");
+  const outPath = srcPath.replace(/\.ybk$/, ".ybk.outputs.json");
+  await Bun.write(mdPath, md);
+  if (Object.keys(outputs).length > 0) {
+    await Bun.write(outPath, JSON.stringify(outputs, null, 2) + "\n");
+  }
+  console.log(`Exported: ${srcPath} → ${mdPath}`);
+  if (Object.keys(outputs).length > 0) console.log(`Outputs: ${outPath}`);
+  process.exit(0);
+
+} else if (command === "import-md") {
+  const { markdownToNotebook } = await import("@codepawl/yeastbook-core");
+  const srcPath = resolve(positional[1] ?? "");
+  if (!srcPath || !srcPath.endsWith(".ybk.md")) {
+    console.error("Usage: yeastbook import-md <file.ybk.md>");
+    process.exit(1);
+  }
+  const md = await Bun.file(srcPath).text();
+  const outPath = srcPath.replace(/\.ybk\.md$/, ".ybk.outputs.json");
+  let outputsJson: string | undefined;
+  try { outputsJson = await Bun.file(outPath).text(); } catch {}
+  const notebook = markdownToNotebook(md, outputsJson);
+  const destPath = srcPath.replace(/\.ybk\.md$/, ".ybk");
+  await Bun.write(destPath, JSON.stringify(notebook, null, 2) + "\n");
+  console.log(`Imported: ${srcPath} → ${destPath}`);
+  process.exit(0);
+
 } else if (command === "install") {
   const srcPath = resolve(positional[1] ?? "");
   if (!srcPath) {
