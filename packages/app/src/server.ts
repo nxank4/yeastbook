@@ -130,6 +130,7 @@ interface ServerState {
   context: Record<string, unknown>;
   pythonKernel: PythonKernel | null;
   yeastBridge: YeastBridge;
+  sqlEngine: any;
 }
 
 function hasDistDir(): boolean {
@@ -194,6 +195,7 @@ export async function startServer(filePath: string, port: number = 3000, devMode
     context: {},
     pythonKernel: null,
     yeastBridge,
+    sqlEngine: null,
   };
 
   // Inject YeastBridge into execution context so TS cells can use yb.push/get
@@ -1026,7 +1028,6 @@ declare function createSelect(config: { options: string[]; value?: string; label
                 for (const mod of cmd.modules) {
                   try {
                     const fresh = await import(`${mod}?t=${Date.now()}`);
-                    // Update context with fresh module
                     state.context[mod.replace(/[^a-zA-Z0-9_$]/g, "_")] = fresh.default ?? fresh;
                   } catch {}
                 }
@@ -1034,6 +1035,51 @@ declare function createSelect(config: { options: string[]; value?: string; label
                   type: "stream", cellId: msg.cellId, name: "stdout",
                   text: `♻ Reloaded: ${cmd.modules.join(", ")}\n`,
                 }));
+              } else if (cmd.type === "sql_attach") {
+                try {
+                  if (!state.sqlEngine) {
+                    const { SqlEngine } = await import("./kernel/sql-engine.ts");
+                    state.sqlEngine = new SqlEngine(dirname(state.filePath));
+                  }
+                  const msg2 = state.sqlEngine.attach(cmd.path, cmd.alias);
+                  ws.send(JSON.stringify({ type: "stream", cellId: msg.cellId, name: "stdout", text: msg2 + "\n" }));
+                } catch (e: any) {
+                  ws.send(JSON.stringify({ type: "stream", cellId: msg.cellId, name: "stderr", text: e.message + "\n" }));
+                }
+              } else if (cmd.type === "sql_import") {
+                try {
+                  if (!state.sqlEngine) {
+                    const { SqlEngine } = await import("./kernel/sql-engine.ts");
+                    state.sqlEngine = new SqlEngine(dirname(state.filePath));
+                  }
+                  const msg2 = await state.sqlEngine.importCsv(cmd.path, cmd.table);
+                  ws.send(JSON.stringify({ type: "stream", cellId: msg.cellId, name: "stdout", text: msg2 + "\n" }));
+                } catch (e: any) {
+                  ws.send(JSON.stringify({ type: "stream", cellId: msg.cellId, name: "stderr", text: e.message + "\n" }));
+                }
+              } else if (cmd.type === "sql") {
+                try {
+                  if (!state.sqlEngine) {
+                    const { SqlEngine } = await import("./kernel/sql-engine.ts");
+                    state.sqlEngine = new SqlEngine(dirname(state.filePath));
+                  }
+                  const result = state.sqlEngine.execute(cmd.query, cmd.db);
+                  if (result.columns.length > 0) {
+                    ws.send(JSON.stringify({
+                      type: "result", cellId: msg.cellId,
+                      value: `${result.rowCount} rows`,
+                      executionCount: ++state.executionCount,
+                      richOutput: { type: "table", rows: result.rows },
+                    }));
+                  } else {
+                    ws.send(JSON.stringify({
+                      type: "stream", cellId: msg.cellId, name: "stdout",
+                      text: `Query OK, ${result.changes ?? 0} rows affected\n`,
+                    }));
+                  }
+                } catch (e: any) {
+                  ws.send(JSON.stringify({ type: "stream", cellId: msg.cellId, name: "stderr", text: `SQL Error: ${e.message}\n` }));
+                }
               }
             }
 

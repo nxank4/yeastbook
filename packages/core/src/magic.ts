@@ -4,7 +4,10 @@ export type MagicCommand =
   | { type: "install"; packages: string[] }
   | { type: "reload"; modules: string[] }
   | { type: "timeit"; runs: number; code: string }
-  | { type: "time"; code: string };
+  | { type: "time"; code: string }
+  | { type: "sql_attach"; path: string; alias?: string }
+  | { type: "sql_import"; path: string; table?: string }
+  | { type: "sql"; query: string; db?: string };
 
 export type CellMagic = { type: "python" };
 
@@ -60,6 +63,29 @@ export function parseMagicCommands(code: string): ParseResult {
       const modules = rest ? rest.split(/\s+/) : [];
       if (modules.length > 0) {
         magic.push({ type: "reload", modules });
+      }
+      continue;
+    }
+
+    if (trimmed.startsWith("%sql attach ")) {
+      const parts = trimmed.slice("%sql attach ".length).trim().split(/\s+as\s+/i);
+      magic.push({ type: "sql_attach", path: parts[0]!, alias: parts[1] });
+      continue;
+    }
+
+    if (trimmed.startsWith("%sql import ")) {
+      const parts = trimmed.slice("%sql import ".length).trim().split(/\s+as\s+/i);
+      magic.push({ type: "sql_import", path: parts[0]!, table: parts[1] });
+      continue;
+    }
+
+    if (trimmed.startsWith("%sql ")) {
+      const rest = trimmed.slice("%sql ".length).trim();
+      const dbMatch = rest.match(/^@(\S+)\s+([\s\S]+)$/);
+      if (dbMatch) {
+        magic.push({ type: "sql", db: dbMatch[1], query: dbMatch[2]! });
+      } else {
+        magic.push({ type: "sql", query: rest });
       }
       continue;
     }

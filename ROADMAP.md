@@ -25,9 +25,9 @@ Core execution engine, Monaco editor, rich output (charts, tables, JSON trees), 
 - [x] Round-trip: open `.ybk.md` back in Yeastbook with full output restore
 
 **SQL Cells** — Native data exploration powered by `bun:sqlite`
-- [ ] `%sql` cell type with syntax highlighting
-- [ ] Drag-and-drop `.db`, `.csv`, `.json` files as queryable tables
-- [ ] Query results render as Interactive Table (existing rich output)
+- [x] `%sql` magic with syntax support
+- [x] Import `.db`, `.csv` files as queryable tables (`%sql attach`, `%sql import`)
+- [x] Query results render as Interactive Table (existing rich output)
 
 **Editor**
 - [x] Multi-cursor support
