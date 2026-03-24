@@ -15,9 +15,10 @@ import type { CellOutput as CellOutputType } from "@codepawl/yeastbook-core";
 
 interface Props {
   outputs: CellOutputType[];
+  performanceMode?: boolean;
 }
 
-export function CellOutput({ outputs }: Props) {
+export function CellOutput({ outputs, performanceMode }: Props) {
   if (outputs.length === 0) return null;
 
   return (
@@ -32,7 +33,7 @@ export function CellOutput({ outputs }: Props) {
           if (out.richOutput) {
             return (
               <div key={i} className="output-rich">
-                <RichOutputRenderer output={out.richOutput} />
+                <RichOutputRenderer output={out.richOutput} performanceMode={performanceMode} />
               </div>
             );
           }
@@ -59,10 +60,10 @@ export function CellOutput({ outputs }: Props) {
   );
 }
 
-function RichOutputRenderer({ output }: { output: NonNullable<CellOutputType["richOutput"]> }) {
+function RichOutputRenderer({ output, performanceMode }: { output: NonNullable<CellOutputType["richOutput"]>; performanceMode?: boolean }) {
   switch (output.type) {
     case "table":
-      return <DataTable rows={output.rows} />;
+      return <DataTable rows={output.rows} performanceMode={performanceMode} />;
     case "chart":
       return <ChartOutput data={output.data} config={output.config as any} />;
     case "html":
@@ -80,7 +81,7 @@ function RichOutputRenderer({ output }: { output: NonNullable<CellOutputType["ri
     case "plugin":
       return <PluginRenderer pluginType={(output as any).pluginType} data={(output as any).data} />;
     case "mime":
-      return <MimeOutput mime={(output as any).mime} data={(output as any).data} url={(output as any).url} />;
+      return <MimeOutput mime={(output as any).mime} data={(output as any).data} url={(output as any).url} performanceMode={performanceMode} />;
     case "widget": {
       const w = output as any;
       const onUpdate = (widgetId: string, value: unknown) => {

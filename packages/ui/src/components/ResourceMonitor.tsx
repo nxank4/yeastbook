@@ -12,6 +12,11 @@ interface SystemStats {
   vramPercent: number | null;
 }
 
+interface Props {
+  performanceMode?: boolean;
+  onSuggestPerfMode?: () => void;
+}
+
 function UsageBar({ label, percent, detail, icon }: { label: string; percent: number | null; detail?: string; icon: string }) {
   if (percent === null) return null;
   const level = percent >= 85 ? "critical" : percent >= 70 ? "warning" : "normal";
@@ -30,9 +35,10 @@ function UsageBar({ label, percent, detail, icon }: { label: string; percent: nu
   );
 }
 
-export function ResourceMonitor() {
+export function ResourceMonitor({ performanceMode, onSuggestPerfMode }: Props) {
   const [stats, setStats] = useState<SystemStats | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [lowMemDismissed, setLowMemDismissed] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -43,19 +49,30 @@ export function ResourceMonitor() {
         .catch(() => {});
     };
     fetchStats();
-    intervalRef.current = setInterval(fetchStats, 2000);
+    // 5x slower in performance mode
+    const interval = performanceMode ? 10000 : 2000;
+    intervalRef.current = setInterval(fetchStats, interval);
     return () => {
       mounted = false;
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, []);
+  }, [performanceMode]);
 
   if (!stats) {
     return <div className="resource-empty"><i className="bi bi-hourglass-split" /> Loading stats...</div>;
   }
 
+  const showLowMemWarning = !performanceMode && !lowMemDismissed && stats.memPercent !== null && stats.memPercent >= 85;
+
   return (
     <div className="resource-monitor">
+      {showLowMemWarning && (
+        <div className="resource-low-mem-warning">
+          <i className="bi bi-exclamation-triangle-fill" />
+          <span>High memory usage. <button className="resource-warn-btn" onClick={onSuggestPerfMode}>Enable Performance Mode</button></span>
+          <button className="resource-warn-dismiss" onClick={() => setLowMemDismissed(true)} title="Dismiss"><i className="bi bi-x" /></button>
+        </div>
+      )}
       <UsageBar
         label="CPU"
         percent={stats.cpuPercent}

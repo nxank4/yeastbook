@@ -53,6 +53,7 @@ export interface Settings {
   execution: {
     autoSaveOnRun: boolean;
     clearOutputBeforeRun: boolean;
+    performanceMode: boolean;
   };
   ai: {
     provider: "anthropic" | "openai" | "disabled";
@@ -68,7 +69,7 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   editor: { fontSize: 13, tabSize: 2, wordWrap: false },
   appearance: { theme: "light", notifications: "show" },
-  execution: { autoSaveOnRun: true, clearOutputBeforeRun: false },
+  execution: { autoSaveOnRun: true, clearOutputBeforeRun: false, performanceMode: false },
   ai: { provider: "disabled", apiKey: "" },
   layout: { maxWidth: "medium", sidebar: false },
 };

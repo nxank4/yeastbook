@@ -19,9 +19,13 @@ interface Props {
   hasVenv?: boolean;
   onCreateVenv?: () => void;
   onRetrySave?: () => void;
+  forceOpenPicker?: boolean;
+  onPickerOpened?: () => void;
+  performanceMode?: boolean;
+  onTogglePerfMode?: () => void;
 }
 
-export function StatusBar({ mode, connected, saved, saveStatus, notification, bunVersion, pythonPath, hasVenv, onCreateVenv, onRetrySave }: Props) {
+export function StatusBar({ mode, connected, saved, saveStatus, notification, bunVersion, pythonPath, hasVenv, onCreateVenv, onRetrySave, forceOpenPicker, onPickerOpened, performanceMode, onTogglePerfMode }: Props) {
   const [envPickerOpen, setEnvPickerOpen] = useState(false);
   const [envs, setEnvs] = useState<PythonEnv[]>([]);
   const [loading, setLoading] = useState(false);
@@ -45,6 +49,15 @@ export function StatusBar({ mode, connected, saved, saveStatus, notification, bu
       body: JSON.stringify({ pythonPath: path }),
     });
   }, []);
+
+  // Open picker when triggered externally (e.g., from menu bar)
+  useEffect(() => {
+    if (forceOpenPicker) {
+      setEnvPickerOpen(true);
+      fetchEnvs();
+      onPickerOpened?.();
+    }
+  }, [forceOpenPicker, fetchEnvs, onPickerOpened]);
 
   // Close picker on outside click
   useEffect(() => {
@@ -77,6 +90,18 @@ export function StatusBar({ mode, connected, saved, saveStatus, notification, bu
       {notification && <span className="status-bar-sep">|</span>}
       {notification && <span className="status-bar-notification">{notification}</span>}
       <span className="status-bar-spacer" />
+      {onTogglePerfMode && (
+        <>
+          <button
+            className={`status-env-btn ${performanceMode ? "status-perf-active" : ""}`}
+            onClick={onTogglePerfMode}
+            title={performanceMode ? "Performance Mode ON — click to disable" : "Enable Performance Mode"}
+          >
+            <i className="bi bi-lightning-charge-fill" /> {performanceMode ? "Perf" : ""}
+          </button>
+          <span className="status-bar-sep">|</span>
+        </>
+      )}
       {bunVersion && (
         <>
           <span className="status-env">Bun v{bunVersion}</span>

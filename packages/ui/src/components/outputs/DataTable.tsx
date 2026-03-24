@@ -2,11 +2,13 @@ import { useState, useMemo, useCallback } from "react";
 
 interface Props {
   rows: Record<string, unknown>[];
+  performanceMode?: boolean;
 }
 
 const PAGE_SIZE = 100;
+const PERF_PAGE_SIZE = 25;
 
-export function DataTable({ rows }: Props) {
+export function DataTable({ rows, performanceMode }: Props) {
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortAsc, setSortAsc] = useState(true);
   const [showAll, setShowAll] = useState(false);
@@ -29,7 +31,8 @@ export function DataTable({ rows }: Props) {
     });
   }, [rows, sortKey, sortAsc]);
 
-  const displayed = showAll ? sorted : sorted.slice(0, PAGE_SIZE);
+  const pageSize = performanceMode ? PERF_PAGE_SIZE : PAGE_SIZE;
+  const displayed = showAll ? sorted : sorted.slice(0, pageSize);
 
   const handleSort = useCallback((key: string) => {
     setSortKey((prev) => {
@@ -69,10 +72,15 @@ export function DataTable({ rows }: Props) {
           ))}
         </tbody>
       </table>
-      {!showAll && rows.length > PAGE_SIZE && (
+      {!showAll && rows.length > pageSize && !performanceMode && (
         <button className="show-more-btn" onClick={() => setShowAll(true)}>
           Show all {rows.length} rows
         </button>
+      )}
+      {!showAll && rows.length > pageSize && performanceMode && (
+        <div className="show-more-btn" style={{ opacity: 0.5 }}>
+          Showing {pageSize} of {rows.length} rows (Performance Mode)
+        </div>
       )}
     </div>
   );

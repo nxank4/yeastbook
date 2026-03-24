@@ -132,6 +132,19 @@ export function SettingsPanel({ open, settings, version, bunVersion, fileFormat,
                 <span className="toggle-knob" />
               </button>
             </label>
+
+            <label className="settings-row">
+              <span>Performance Mode</span>
+              <button
+                className={`toggle ${settings.execution.performanceMode ? "on" : ""}`}
+                onClick={() => update({ execution: { ...settings.execution, performanceMode: !settings.execution.performanceMode } })}
+                role="switch"
+                aria-checked={settings.execution.performanceMode}
+              >
+                <span className="toggle-knob" />
+              </button>
+            </label>
+            <p className="settings-hint">Reduces animations, polling frequency, and auto-rendering of large outputs.</p>
           </section>
 
           <section className="settings-section">
