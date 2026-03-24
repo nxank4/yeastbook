@@ -15,7 +15,7 @@ Core execution engine, Monaco editor, rich output (charts, tables, JSON trees), 
 ## Planned
 
 **Zero-Setup Reproducibility** — "Write once, run anywhere" for notebooks
-- [ ] Embed `package.json` + `bun.lockb` in `.ybk` metadata on save
+- [x] Embed `package.json` + `bun.lock` in `.ybk` metadata on save
 - [x] Auto-detect missing dependencies on open → prompt install via Bun
 - [x] `bunx yeastbook file.ybk` installs deps + runs in one step
 

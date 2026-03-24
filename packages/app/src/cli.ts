@@ -94,6 +94,23 @@ async function autoInstallDeps(notebookPath: string): Promise<void> {
   try {
     const content = await Bun.file(notebookPath).text();
     const notebook = JSON.parse(content);
+    const notebookDir = dirname(notebookPath);
+
+    // Restore embedded package.json and bun.lock if no local package.json exists
+    const localPkg = join(notebookDir, "package.json");
+    if (!existsSync(localPkg) && notebook.metadata?.packageJson) {
+      console.log("\x1b[36m📋 Restoring embedded package.json from notebook...\x1b[0m");
+      await Bun.write(localPkg, notebook.metadata.packageJson);
+      if (notebook.metadata.bunLock) {
+        await Bun.write(join(notebookDir, "bun.lock"), notebook.metadata.bunLock);
+      }
+      const proc = Bun.spawn(["bun", "install"], { cwd: notebookDir, stdout: "inherit", stderr: "inherit" });
+      await proc.exited;
+      console.log("\x1b[32m✓ Dependencies restored from notebook\x1b[0m");
+      return;
+    }
+
+    // Fallback: check metadata.dependencies for missing packages
     const deps = notebook.metadata?.dependencies;
     if (!deps || Object.keys(deps).length === 0) return;
 
