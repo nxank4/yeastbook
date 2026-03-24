@@ -221,10 +221,25 @@ export async function startServer(filePath: string, port: number = 3000, devMode
 
   let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
 
+  async function embedDepsInMetadata() {
+    const notebookDir = dirname(state.filePath);
+    try {
+      const pkgPath = join(notebookDir, "package.json");
+      const lockPath = join(notebookDir, "bun.lock");
+      if (existsSync(pkgPath)) {
+        state.notebook.ybk.metadata.packageJson = await Bun.file(pkgPath).text();
+      }
+      if (existsSync(lockPath)) {
+        state.notebook.ybk.metadata.bunLock = await Bun.file(lockPath).text();
+      }
+    } catch { /* skip if can't read */ }
+  }
+
   function scheduleAutoSave() {
     if (autoSaveTimer) clearTimeout(autoSaveTimer);
     autoSaveTimer = setTimeout(async () => {
       try {
+        await embedDepsInMetadata();
         ownWriteMarker.mark();
         await state.notebook.save(state.filePath);
         for (const c of clients) {
