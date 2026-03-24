@@ -41,6 +41,9 @@ export function detectOutputType(value: unknown): OutputData | null {
     if (v.__type === "vega" && isPlainObject(v.spec)) {
       return { type: "vega", spec: v.spec } as any;
     }
+    if (v.__type === "dataframe" && Array.isArray(v.columns) && Array.isArray(v.data)) {
+      return { type: "dataframe", columns: v.columns, data: v.data, shape: v.shape } as any;
+    }
   }
 
   // Check for MIME output
