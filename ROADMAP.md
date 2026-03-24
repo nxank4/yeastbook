@@ -32,7 +32,7 @@ Core execution engine, Monaco editor, rich output (charts, tables, JSON trees), 
 **Editor**
 - [x] Multi-cursor support
 - [x] Cell folding
-- [ ] Find & replace across cells
+- [x] Find & replace across cells
 
 **Kernel**
 - [x] `%install`-style magic for Bun packages

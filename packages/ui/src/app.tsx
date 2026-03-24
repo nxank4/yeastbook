@@ -10,6 +10,7 @@ import { DependenciesPanel } from "./components/DependenciesPanel.tsx";
 import { VariableExplorer } from "./components/VariableExplorer.tsx";
 import { FileExplorer } from "./components/FileExplorer.tsx";
 import { PerfHUD } from "./components/PerfHUD.tsx";
+import { FindReplace } from "./components/FindReplace.tsx";
 import { useWebSocket } from "./useWebSocket.ts";
 import { useKeyboardShortcuts, type Mode } from "./hooks/useKeyboardShortcuts.ts";
 import { useHistory } from "./hooks/useHistory.ts";
@@ -45,6 +46,7 @@ export function App() {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [findReplaceOpen, setFindReplaceOpen] = useState(false);
   const [installStates, setInstallStates] = useState<Map<string, { packages: string[]; logs: string[]; done: boolean; error?: string }>>(new Map());
   const [mode, setMode] = useState<Mode>("command");
   const [isPresenting, setIsPresenting] = useState(
@@ -1047,6 +1049,7 @@ export function App() {
     onRedo: history.redo,
     onToggleFileExplorer: () => setLeftSidebarOpen((p) => !p),
     onFocusCell: (cellId: string) => setFocusedCellId(cellId),
+    onToggleFindReplace: () => setFindReplaceOpen((p) => !p),
   });
 
   return (
@@ -1138,6 +1141,12 @@ export function App() {
           />
         </div>
       )}
+      <FindReplace
+        open={findReplaceOpen}
+        onClose={() => setFindReplaceOpen(false)}
+        editorRefs={editorRefsMap}
+        onSourceChange={handleSourceChange}
+      />
       <NotebookView
         cells={cells}
         busyCells={busyCells}

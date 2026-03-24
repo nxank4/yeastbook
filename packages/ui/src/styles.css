@@ -944,6 +944,43 @@ input, textarea, select {
 .output-area:empty { display: none; }
 .math-output { padding: 8px 0; overflow-x: auto; }
 
+/* --- Find & Replace --- */
+.find-replace-bar {
+  position: sticky; top: 80px; z-index: 20;
+  display: flex; align-items: flex-start; gap: 12px;
+  background: var(--bg-surface); border: 1px solid var(--border-subtle);
+  border-radius: 8px; padding: 8px 12px; margin: 0 auto 12px;
+  max-width: var(--notebook-max-width);
+  box-shadow: var(--shadow-dropdown);
+}
+.find-replace-inputs { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.find-replace-row { display: flex; align-items: center; gap: 8px; }
+.find-replace-input {
+  flex: 1; padding: 4px 8px; border: 1px solid var(--border-subtle);
+  border-radius: 6px; background: var(--bg-app); color: var(--text-primary);
+  font-family: 'JetBrains Mono', monospace; font-size: 13px; outline: none;
+}
+.find-replace-input:focus { border-color: var(--accent); }
+.find-replace-count { font-size: 11px; color: var(--text-muted); min-width: 70px; white-space: nowrap; }
+.find-replace-btn {
+  padding: 3px 10px; border: 1px solid var(--border-subtle); border-radius: 6px;
+  background: var(--bg-surface); color: var(--text-secondary); cursor: pointer;
+  font-size: 11px; font-family: 'Inter', sans-serif; white-space: nowrap;
+}
+.find-replace-btn:hover { border-color: var(--accent); color: var(--accent); }
+.find-replace-options { display: flex; align-items: center; gap: 6px; }
+.find-replace-option {
+  display: flex; align-items: center; gap: 2px;
+  font-size: 11px; color: var(--text-muted); cursor: pointer;
+  font-family: 'JetBrains Mono', monospace;
+}
+.find-replace-option input { width: 14px; height: 14px; accent-color: var(--accent); }
+.find-replace-close {
+  background: none; border: none; color: var(--text-muted); cursor: pointer;
+  font-size: 14px; padding: 2px;
+}
+.find-replace-close:hover { color: var(--text-primary); }
+
 .output-section { position: relative; }
 
 .output-actions {

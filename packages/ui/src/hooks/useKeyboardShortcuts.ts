@@ -26,6 +26,7 @@ interface ShortcutHandlers {
   onRedo: () => void;
   onToggleFileExplorer: () => void;
   onFocusCell: (cellId: string) => void;
+  onToggleFindReplace?: () => void;
 }
 
 export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
@@ -52,6 +53,11 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "e" || e.key === "E")) {
         e.preventDefault();
         h.onTogglePresentation();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "h" || e.key === "H")) {
+        e.preventDefault();
+        h.onToggleFindReplace?.();
         return;
       }
 
