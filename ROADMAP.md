@@ -2,21 +2,21 @@
 
 ## Current: v0.0.x (Internal Dev)
 
-Core execution engine, Monaco editor, rich output (charts, tables, JSON trees), Jupyter import/export, session persistence, VS Code extension.
+Core execution engine, Monaco editor, rich output (charts, tables, JSON trees), Jupyter import/export, session persistence, VS Code extension, Python bridge with YeastBridge, native language selector.
 
 ## Next: v0.1.0 (Public Beta)
 
-- [ ] `bunx yeastbook new` works on a another user's machine
+- [ ] `bunx @codepawl/yeastbook new` works on another user's machine
 - [ ] No crash during normal usage
-- [ ] README sufficient for new users
-- [ ] Binary builds on Linux + macOS
+- [x] README sufficient for new users
+- [x] Binary builds on Linux + macOS
 - [ ] At least 1-2 external testers confirm usable
 
 ## Planned
 
 **Zero-Setup Reproducibility** — "Write once, run anywhere" for notebooks
 - [ ] Embed `package.json` + `bun.lockb` in `.ybk` metadata on save
-- [ ] Auto-detect missing dependencies on open → prompt install via Bun
+- [x] Auto-detect missing dependencies on open → prompt install via Bun
 - [ ] `bunx yeastbook file.ybk` installs deps + runs in one step
 
 **Readable Diff Mode** — Git-friendly notebook format
@@ -30,14 +30,14 @@ Core execution engine, Monaco editor, rich output (charts, tables, JSON trees), 
 - [ ] Query results render as Interactive Table (existing rich output)
 
 **Editor**
-- [ ] Multi-cursor support
-- [ ] Cell folding
+- [x] Multi-cursor support
+- [x] Cell folding
 - [ ] Find & replace across cells
 
 **Kernel**
-- [ ] `%pip`-style magic for Bun packages
-- [ ] Cell execution queue with cancel
-- [ ] Session export/restore
+- [x] `%install`-style magic for Bun packages
+- [x] Cell execution queue with cancel
+- [x] Session export/restore (snapshot persistence)
 
 **Output**
 - [ ] Interactive DataFrame viewer
@@ -45,13 +45,13 @@ Core execution engine, Monaco editor, rich output (charts, tables, JSON trees), 
 - [ ] LaTeX/KaTeX math rendering
 
 **Ecosystem**
-- [ ] Plugin API for custom output renderers
-- [ ] npm publish for `yeastbook` CLI
-- [ ] Homebrew formula
+- [x] Plugin API for custom output renderers
+- [x] npm publish for `@codepawl/yeastbook` CLI
+- [x] Homebrew formula
 
 ## Non-Goals (for now)
 
 - Multi-user collaboration (Google Docs style)
 - Cloud hosting / Yeastbook-as-a-service
-- Python/R kernel support
+- R kernel support
 - JupyterHub compatibility
