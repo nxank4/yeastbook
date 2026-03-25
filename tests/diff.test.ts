@@ -110,7 +110,7 @@ describe("notebook diff", () => {
 
   test("same source but different outputs is NOT counted as modified", () => {
     const old = {
-      cells: [{ id: "1", type: "code" as const, source: "x = 1", outputs: [{ data: "old" }] }],
+      cells: [{ id: "1", type: "code" as const, source: "x = 1", outputs: [{ output_type: "execute_result" as const, data: { "text/plain": "old" }, metadata: {}, execution_count: 1 }] }],
     };
     const newer = {
       cells: [{ id: "1", type: "code" as const, source: "x = 1", outputs: [] }],
