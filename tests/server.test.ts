@@ -150,7 +150,10 @@ describe("WebSocket execution", () => {
       ws.onmessage = (event) => {
         const msg = JSON.parse(event.data as string);
         messages.push(msg);
-        if (msg.type === "status" && msg.status === "idle") resolve();
+        // Wait until we have both the error and the idle status
+        const hasError = messages.some((m) => m.type === "error");
+        const hasIdle = messages.some((m) => m.type === "status" && m.status === "idle");
+        if (hasError && hasIdle) resolve();
       };
     });
     ws.close();
