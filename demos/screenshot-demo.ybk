@@ -21,12 +21,16 @@
     {
       "id": "hero-code",
       "type": "code",
-      "source": "// Quick data analysis\nconst sales = [\n  { month: \"Jan\", revenue: 4200 },\n  { month: \"Feb\", revenue: 5800 },\n  { month: \"Mar\", revenue: 7100 },\n  { month: \"Apr\", revenue: 6300 },\n  { month: \"May\", revenue: 8900 },\n  { month: \"Jun\", revenue: 9400 },\n]\n\nconst total = sales.reduce((s, r) => s + r.revenue, 0)\nconsole.log(`Total revenue: $${total.toLocaleString()}`)\nconsole.log(`Average: $${(total / sales.length).toLocaleString()}`)\nconsole.log(`Best month: ${sales.sort((a, b) => b.revenue - a.revenue)[0].month}`)\nsales"
+      "source": "// Quick data analysis\nconst sales = [\n  { month: \"Jan\", revenue: 4200 },\n  { month: \"Feb\", revenue: 5800 },\n  { month: \"Mar\", revenue: 7100 },\n  { month: \"Apr\", revenue: 6300 },\n  { month: \"May\", revenue: 8900 },\n  { month: \"Jun\", revenue: 9400 },\n]\n\nconst total = sales.reduce((s, r) => s + r.revenue, 0)\nconsole.log(`Total revenue: $${total.toLocaleString()}`)\nconsole.log(`Average: $${(total / sales.length).toLocaleString()}`)\nconsole.log(`Best month: ${sales.sort((a, b) => b.revenue - a.revenue)[0].month}`)\nsales",
+      "outputs": [],
+      "executionCount": null
     },
     {
       "id": "hero-chart",
       "type": "code",
-      "source": ";({\n  __type: \"chart\",\n  config: {\n    chartType: \"bar\",\n    title: \"Monthly Revenue\",\n    xLabel: \"Month\",\n    yLabel: \"Revenue ($)\"\n  },\n  data: [4200, 5800, 7100, 6300, 8900, 9400],\n  labels: [\"Jan\", \"Feb\", \"Mar\", \"Apr\", \"May\", \"Jun\"]\n})"
+      "source": "// Visualize revenue by month\nconst chart = { __type: \"chart\", config: { chartType: \"bar\", title: \"Monthly Revenue\", xLabel: \"Month\", yLabel: \"Revenue ($)\" }, data: [4200, 5800, 7100, 6300, 8900, 9400], labels: [\"Jan\", \"Feb\", \"Mar\", \"Apr\", \"May\", \"Jun\"] }\nchart",
+      "outputs": [],
+      "executionCount": null
     },
     {
       "id": "rich-md",
@@ -36,12 +40,16 @@
     {
       "id": "rich-table",
       "type": "code",
-      "source": "// Any array of objects auto-renders as a table\n[\n  { name: \"Alice\", role: \"Engineer\", score: 94 },\n  { name: \"Bob\", role: \"Designer\", score: 87 },\n  { name: \"Carol\", role: \"PM\", score: 91 },\n  { name: \"Dan\", role: \"Engineer\", score: 96 },\n  { name: \"Eve\", role: \"Designer\", score: 89 },\n]"
+      "source": "// Any array of objects auto-renders as a table\nfunction getTeam() {\n  return [\n    { name: \"Alice\", role: \"Engineer\", score: 94 },\n    { name: \"Bob\", role: \"Designer\", score: 87 },\n    { name: \"Carol\", role: \"PM\", score: 91 },\n    { name: \"Dan\", role: \"Engineer\", score: 96 },\n    { name: \"Eve\", role: \"Designer\", score: 89 },\n  ]\n}\ngetTeam()",
+      "outputs": [],
+      "executionCount": null
     },
     {
       "id": "rich-math",
       "type": "code",
-      "source": ";({ __type: \"math\", latex: \"\\\\nabla \\\\times \\\\mathbf{E} = -\\\\frac{\\\\partial \\\\mathbf{B}}{\\\\partial t}\" })"
+      "source": "const eq = { __type: \"math\", latex: \"\\\\nabla \\\\times \\\\mathbf{E} = -\\\\frac{\\\\partial \\\\mathbf{B}}{\\\\partial t}\" }\neq",
+      "outputs": [],
+      "executionCount": null
     },
     {
       "id": "sql-md",
@@ -51,12 +59,16 @@
     {
       "id": "sql-import",
       "type": "code",
-      "source": "%sql CREATE TABLE IF NOT EXISTS products (name TEXT, category TEXT, price REAL, stock INT);\n%sql INSERT INTO products VALUES ('Laptop', 'Electronics', 999.99, 45), ('Keyboard', 'Electronics', 79.99, 200), ('Notebook', 'Office', 12.99, 500), ('Monitor', 'Electronics', 349.99, 78), ('Pen Set', 'Office', 24.99, 300), ('Webcam', 'Electronics', 59.99, 150);"
+      "source": "%sql CREATE TABLE IF NOT EXISTS products (name TEXT, category TEXT, price REAL, stock INT);\n%sql INSERT INTO products VALUES ('Laptop', 'Electronics', 999.99, 45), ('Keyboard', 'Electronics', 79.99, 200), ('Notebook', 'Office', 12.99, 500), ('Monitor', 'Electronics', 349.99, 78), ('Pen Set', 'Office', 24.99, 300), ('Webcam', 'Electronics', 59.99, 150);",
+      "outputs": [],
+      "executionCount": null
     },
     {
       "id": "sql-query",
       "type": "code",
-      "source": "%sql SELECT category, COUNT(*) as items, ROUND(AVG(price), 2) as avg_price, SUM(stock) as total_stock FROM products GROUP BY category ORDER BY avg_price DESC"
+      "source": "%sql SELECT category, COUNT(*) as items, ROUND(AVG(price), 2) as avg_price, SUM(stock) as total_stock FROM products GROUP BY category ORDER BY avg_price DESC",
+      "outputs": [],
+      "executionCount": null
     }
   ]
 }
