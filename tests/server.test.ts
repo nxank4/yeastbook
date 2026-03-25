@@ -186,17 +186,13 @@ describe("WebSocket execution", () => {
     });
     // Execute second cell: read the variable
     const messages: any[] = [];
-    ws.onmessage = (event) => {
-      const msg = JSON.parse(event.data as string);
-      messages.push(msg);
-    };
-    ws.send(JSON.stringify({ type: "execute", cellId: cellId2, code: "testCtx" }));
     await new Promise<void>((resolve) => {
-      const check = () => {
-        if (messages.find((m) => m.type === "status" && m.status === "idle")) resolve();
-        else setTimeout(check, 50);
+      ws.onmessage = (event) => {
+        const msg = JSON.parse(event.data as string);
+        messages.push(msg);
+        if (msg.type === "status" && msg.status === "idle") resolve();
       };
-      check();
+      ws.send(JSON.stringify({ type: "execute", cellId: cellId2, code: "testCtx" }));
     });
     ws.close();
     const result = messages.find((m) => m.type === "result");
