@@ -56,12 +56,39 @@ All source imports use `@codepawl/yeastbook-core`. Workspace dependencies use `w
 
 ## Publishing
 
-Packages publish to the `@codepawl` npm org.
+Packages publish to the `@codepawl` npm org. VS Code extension publishes to the marketplace under publisher `codepawl`.
+
+### Version Bumping
+
+```bash
+bun run bump 0.0.3  # bumps all 5 package.json files (root, core, ui, app, vscode)
+```
+
+### Release Flow
+
+1. `bun run bump <version>` — bump all packages
+2. Commit and tag: `git commit -m "chore: bump version to <version>" && git tag v<version>`
+3. Push: `git push origin staging --tags`
+4. CI (`release.yml` + `cd.yml`) automatically:
+   - Publishes npm packages (core → ui → app)
+   - Builds + publishes VS Code extension to marketplace
+   - Requires `VSCE_PAT` GitHub secret for VS Code marketplace
+
+### Manual Publish
 
 ```bash
 npm login
 bun run publish:all  # builds UI + embeds assets + publishes core → ui → app
+cd packages/vscode && bunx @vscode/vsce publish  # VS Code extension
 ```
+
+### Screenshots
+
+```bash
+bun run screenshots  # captures demo-hero.png, demo-rich-output.png, demo-sql.png into assets/
+```
+
+Run this before releases to keep README images up to date.
 
 ## Dev Mode
 
