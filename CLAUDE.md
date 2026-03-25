@@ -51,7 +51,8 @@ All source imports use `@codepawl/yeastbook-core`. Workspace dependencies use `w
 - [ ] Binary builds on Linux + Mac
 
 ### Release History
-- **0.0.2** (current) — automated screenshots, SQL cells, multi-line expression fix, sidebar
+- **0.0.3** (current) — file preview, jump-to-error button, auto-scroll, parser analysis, Tech Stack docs
+- **0.0.2** — automated screenshots, SQL cells, multi-line expression fix, sidebar
 - **0.0.1** — core execution, Monaco editor, rich output, Python bridge, VS Code extension
 
 ## Publishing
