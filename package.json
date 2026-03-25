@@ -1,9 +1,11 @@
 {
   "name": "yeastbook-monorepo",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "private": true,
   "license": "MIT",
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "dev": "bun run dev:ui & bun run dev:server",
     "dev:server": "bun --watch packages/app/src/cli.ts new --dev",

@@ -1,10 +1,15 @@
 {
   "name": "@codepawl/yeastbook-core",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "main": "src/index.ts",
   "types": "src/index.ts",
-  "publishConfig": { "access": "public" },
-  "files": ["src/", "package.json"],
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "src/",
+    "package.json"
+  ],
   "license": "MIT",
   "description": "Shared types and logic for Yeastbook notebook",
   "repository": {

@@ -94,6 +94,18 @@ That's it. No Python, no conda, no kernel installs. Opens in your browser in und
 
 ---
 
+## Tech Stack
+
+- **Runtime**: [Bun](https://bun.sh) — fast JavaScript/TypeScript runtime
+- **Language**: TypeScript (with Python cell support via persistent daemon)
+- **Editor**: Monaco (VS Code's editor engine) with IntelliSense
+- **UI**: React, bundled via Bun's built-in bundler
+- **Database**: bun:sqlite for SQL cells
+- **Format**: `.ybk` (JSON-based) with `.ipynb` import/export
+- **CI/CD**: GitHub Actions — test, build, publish on tag push
+
+---
+
 ## Install
 
 ```bash
@@ -243,7 +255,7 @@ git clone https://github.com/codepawl/yeastbook
 cd yeastbook
 bun install
 bun run dev          # Build UI + start dev server with hot reload
-bun test             # Run tests (197 tests)
+bun test             # Run tests (285 tests)
 bun run build:all    # Full build (UI + embed + all platform binaries)
 ```
 

@@ -1,10 +1,14 @@
 {
   "name": "@codepawl/yeastbook-ui",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "publishConfig": {
     "access": "public"
   },
-  "files": ["src/", "dist/", "package.json"],
+  "files": [
+    "src/",
+    "dist/",
+    "package.json"
+  ],
   "license": "MIT",
   "description": "UI components for Yeastbook notebook",
   "repository": {

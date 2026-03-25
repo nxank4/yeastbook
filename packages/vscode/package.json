@@ -2,7 +2,7 @@
   "name": "vscode-yeastbook",
   "displayName": "Yeastbook",
   "description": "A TypeScript notebook powered by Bun. One command, zero config. No Python, no conda, no kernel installs.",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "publisher": "codepawl",
   "repository": {
     "type": "git",
@@ -14,42 +14,99 @@
     "url": "https://github.com/codepawl/yeastbook/issues"
   },
   "license": "MIT",
-  "engines": { "vscode": "^1.85.0" },
-  "activationEvents": ["onNotebook:yeastbook"],
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "activationEvents": [
+    "onNotebook:yeastbook"
+  ],
   "icon": "icon.png",
-  "categories": ["Notebooks", "Programming Languages"],
-  "keywords": ["typescript", "notebook", "bun", "jupyter", "yeastbook"],
+  "categories": [
+    "Notebooks",
+    "Programming Languages"
+  ],
+  "keywords": [
+    "typescript",
+    "notebook",
+    "bun",
+    "jupyter",
+    "yeastbook"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
-    "notebooks": [{
-      "type": "yeastbook",
-      "displayName": "Yeastbook Notebook",
-      "selector": [
-        { "filenamePattern": "*.ybk" }
-      ]
-    }],
-    "languages": [{
-      "id": "yeastbook",
-      "aliases": ["Yeastbook"],
-      "extensions": [".ybk"],
-      "icon": {
-        "light": "./icon-small.png",
-        "dark": "./icon-small.png"
+    "notebooks": [
+      {
+        "type": "yeastbook",
+        "displayName": "Yeastbook Notebook",
+        "selector": [
+          {
+            "filenamePattern": "*.ybk"
+          }
+        ]
       }
-    }],
+    ],
+    "languages": [
+      {
+        "id": "yeastbook",
+        "aliases": [
+          "Yeastbook"
+        ],
+        "extensions": [
+          ".ybk"
+        ],
+        "icon": {
+          "light": "./icon-small.png",
+          "dark": "./icon-small.png"
+        }
+      }
+    ],
     "commands": [
-      { "command": "yeastbook.runAll", "title": "Yeastbook: Run All Cells", "icon": "$(run-all)" },
-      { "command": "yeastbook.restartKernel", "title": "Yeastbook: Restart Kernel", "icon": "$(debug-restart)" },
-      { "command": "yeastbook.openInBrowser", "title": "Yeastbook: Open in Browser", "icon": "$(globe)" },
-      { "command": "yeastbook.exportScript", "title": "Yeastbook: Export as Script" },
-      { "command": "yeastbook.stripOutputs", "title": "Yeastbook: Strip Outputs" },
-      { "command": "yeastbook.showServerLogs", "title": "Yeastbook: Show Server Logs", "icon": "$(output)" },
-      { "command": "yeastbook.selectPythonEnvironment", "title": "Yeastbook: Select Python Environment", "icon": "$(symbol-misc)" }
+      {
+        "command": "yeastbook.runAll",
+        "title": "Yeastbook: Run All Cells",
+        "icon": "$(run-all)"
+      },
+      {
+        "command": "yeastbook.restartKernel",
+        "title": "Yeastbook: Restart Kernel",
+        "icon": "$(debug-restart)"
+      },
+      {
+        "command": "yeastbook.openInBrowser",
+        "title": "Yeastbook: Open in Browser",
+        "icon": "$(globe)"
+      },
+      {
+        "command": "yeastbook.exportScript",
+        "title": "Yeastbook: Export as Script"
+      },
+      {
+        "command": "yeastbook.stripOutputs",
+        "title": "Yeastbook: Strip Outputs"
+      },
+      {
+        "command": "yeastbook.showServerLogs",
+        "title": "Yeastbook: Show Server Logs",
+        "icon": "$(output)"
+      },
+      {
+        "command": "yeastbook.selectPythonEnvironment",
+        "title": "Yeastbook: Select Python Environment",
+        "icon": "$(symbol-misc)"
+      }
     ],
     "menus": {
       "notebook/toolbar": [
-        { "command": "yeastbook.restartKernel", "group": "navigation/execute@1", "when": "notebookType == yeastbook" },
-        { "command": "yeastbook.openInBrowser", "group": "navigation/execute@2", "when": "notebookType == yeastbook" }
+        {
+          "command": "yeastbook.restartKernel",
+          "group": "navigation/execute@1",
+          "when": "notebookType == yeastbook"
+        },
+        {
+          "command": "yeastbook.openInBrowser",
+          "group": "navigation/execute@2",
+          "when": "notebookType == yeastbook"
+        }
       ]
     },
     "configuration": {
