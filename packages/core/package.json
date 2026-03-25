@@ -1,6 +1,6 @@
 {
   "name": "@codepawl/yeastbook-core",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "main": "src/index.ts",
   "types": "src/index.ts",
   "publishConfig": {
@@ -14,7 +14,7 @@
   "description": "Shared types and logic for Yeastbook notebook",
   "repository": {
     "type": "git",
-    "url": "https://github.com/nxank4/yeastbook",
+    "url": "https://github.com/codepawl/yeastbook",
     "directory": "packages/core"
   }
 }

@@ -2,7 +2,7 @@
   "name": "vscode-yeastbook",
   "displayName": "Yeastbook",
   "description": "A TypeScript notebook powered by Bun. One command, zero config. No Python, no conda, no kernel installs.",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "publisher": "codepawl",
   "repository": {
     "type": "git",
