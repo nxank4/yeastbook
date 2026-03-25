@@ -22,7 +22,7 @@
     },
     "packages/app": {
       "name": "@codepawl/yeastbook",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "bin": {
         "yeastbook": "./src/cli.ts",
       },
@@ -32,11 +32,11 @@
     },
     "packages/core": {
       "name": "@codepawl/yeastbook-core",
-      "version": "0.0.1",
+      "version": "0.0.2",
     },
     "packages/ui": {
       "name": "@codepawl/yeastbook-ui",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "dependencies": {
         "@atlaskit/pragmatic-drag-and-drop": "^1.7.9",
         "@atlaskit/pragmatic-drag-and-drop-auto-scroll": "^2.0.0",
@@ -64,7 +64,7 @@
     },
     "packages/vscode": {
       "name": "vscode-yeastbook",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "devDependencies": {
         "@types/vscode": "^1.85.0",
         "@types/ws": "^8.5.0",
