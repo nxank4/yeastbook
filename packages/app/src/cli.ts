@@ -492,7 +492,7 @@ if (!command || command === "new" || command === "serve") {
   };
 
   process.on("SIGINT", gracefulShutdown);
-  setupKeyboard(server.port, gracefulShutdown);
+  setupKeyboard(server.port ?? 0, gracefulShutdown);
 
   if (!dev) autoOpenBrowser(server as any, noOpen);
 } else if (command === "export") {
@@ -801,7 +801,7 @@ if (!command || command === "new" || command === "serve") {
   };
 
   process.on("SIGINT", gracefulShutdown);
-  setupKeyboard(server.port, gracefulShutdown);
+  setupKeyboard(server.port ?? 0, gracefulShutdown);
 
   autoOpenBrowser(server as any, noOpen);
 }

@@ -936,7 +936,7 @@ declare function createSelect(config: { options: string[]; value?: string; label
           const abs = validatePath(destPath, cwd);
           if (!abs) return new Response("Access denied", { status: 403 });
           await mkdir(dirname(abs), { recursive: true });
-          await Bun.write(abs, req.body!);
+          await Bun.write(abs, await req.arrayBuffer());
           return Response.json({ ok: true });
         },
       },
