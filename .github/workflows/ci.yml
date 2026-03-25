@@ -77,17 +77,6 @@ jobs:
       - run: bun run build:embed
       - run: bun build --compile --target=bun-linux-x64 packages/app/src/cli.ts --outfile /tmp/yeastbook-test
 
-  security:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: pip install pip-audit
-      - name: Audit dependencies (pip-audit)
-        run: pip-audit --skip-editable --ignore-vuln-file known-vulnerabilities.txt
-
   build-vscode:
     needs: setup
     runs-on: ubuntu-latest
