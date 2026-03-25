@@ -187,4 +187,72 @@ describe("ExecutionQueue", () => {
     // Final call should be 0
     expect(lengths[lengths.length - 1]).toBe(0);
   });
+
+  test("cancelCell on nonexistent id returns false", () => {
+    const queue = new ExecutionQueue();
+    expect(queue.cancelCell("nonexistent-id")).toBe(false);
+  });
+
+  test("cancelAll empties the queue", async () => {
+    const queue = new ExecutionQueue();
+
+    // Use a long-running executor to keep first item busy
+    const executor: Executor = async () => {
+      await delay(200);
+    };
+
+    // First item starts running immediately; second and third are queued
+    queue.enqueue("cell-1", "code", 1, executor).catch(() => {});
+    queue.enqueue("cell-2", "code", 2, executor).catch(() => {});
+    queue.enqueue("cell-3", "code", 3, executor).catch(() => {});
+
+    // Give cell-1 time to start so cell-2 and cell-3 sit in the queue
+    await delay(5);
+    expect(queue.length).toBe(2);
+
+    queue.cancelAll();
+    expect(queue.length).toBe(0);
+  });
+
+  test("onStatusChange fires with 'queued' when item is enqueued", async () => {
+    const queue = new ExecutionQueue();
+    const statuses: Array<{ cellId: string; status: string }> = [];
+
+    queue.onStatusChange = (cellId, status) => statuses.push({ cellId, status });
+
+    const executor: Executor = async () => {
+      await delay(5);
+    };
+
+    const p1 = queue.enqueue("cell-A", "code", 1, executor);
+    const p2 = queue.enqueue("cell-B", "code", 2, executor);
+
+    await Promise.all([p1, p2]);
+
+    const queued = statuses.filter((s) => s.status === "queued");
+    expect(queued.some((s) => s.cellId === "cell-A")).toBe(true);
+  });
+
+  test("enqueue 3 items while executor is busy gives queue.length of 2", async () => {
+    const queue = new ExecutionQueue();
+
+    const executor: Executor = async () => {
+      await delay(200);
+    };
+
+    // First item starts executing immediately (not in queue)
+    queue.enqueue("cell-1", "code", 1, executor).catch(() => {});
+
+    // Small delay to ensure cell-1 has started running
+    await delay(5);
+
+    // These two should be waiting in the queue
+    queue.enqueue("cell-2", "code", 2, executor).catch(() => {});
+    queue.enqueue("cell-3", "code", 3, executor).catch(() => {});
+
+    expect(queue.length).toBe(2);
+
+    // Clean up
+    queue.cancelAll();
+  });
 });

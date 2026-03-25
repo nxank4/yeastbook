@@ -59,6 +59,36 @@ describe("serializeContext", () => {
     // undefined is not JSON serializable
     expect(vars.u?.serializable).toBe(false);
   });
+
+  test("Date serializes to ISO string", () => {
+    const vars = serializeContext({ d: new Date("2024-01-01") });
+    expect(vars.d).toBeDefined();
+    expect(vars.d!.serializable).toBe(true);
+    expect(typeof vars.d!.value).toBe("string");
+    expect(vars.d!.value as string).toContain("2024-01-01");
+  });
+
+  test("Map with entries is not meaningfully serializable (round-trips as empty object)", () => {
+    // JSON.stringify(new Map([["a", 1]])) returns "{}" — data is lost
+    const map = new Map([["key", "value"]]);
+    const vars = serializeContext({ m: map });
+    expect(vars.m).toBeDefined();
+    // Either serializable is false, or the serialized value lost the Map entries
+    if (vars.m!.serializable) {
+      // If serializable is true, the value must have lost the Map's data (round-tripped as {})
+      expect(vars.m!.value).toEqual({});
+    } else {
+      expect(vars.m!.serializable).toBe(false);
+    }
+  });
+
+  test("deeply nested plain object is serializable and preserves structure", () => {
+    const vars = serializeContext({ deep: { a: { b: { c: 42 } } } });
+    expect(vars.deep).toBeDefined();
+    expect(vars.deep!.serializable).toBe(true);
+    const val = vars.deep!.value as { a: { b: { c: number } } };
+    expect(val.a.b.c).toBe(42);
+  });
 });
 
 describe("saveSnapshot / loadSnapshot / clearSnapshot", () => {

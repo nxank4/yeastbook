@@ -189,6 +189,51 @@ describe("transformImports", () => {
     expect(transformImports('import _ from "lodash";'))
       .toBe('const _ = (await import("lodash")).default');
   });
+
+  test("multi-line named import", () => {
+    const result = transformImports('import {\n  chunk,\n  merge\n} from "lodash"');
+    // The transform joins named imports from the multi-line form; verify key parts
+    expect(result).toContain("chunk");
+    expect(result).toContain("merge");
+    expect(result).toContain('await import("lodash")');
+    expect(result).toMatch(/^const \{/);
+  });
+
+  test("aliased named import", () => {
+    expect(transformImports('import { foo as bar } from "mod"'))
+      .toBe('const { foo as bar } = await import("mod")');
+  });
+});
+
+describe("transformCellCode edge cases", () => {
+  test("comment-only code does not get a bare return", () => {
+    const result = transformCellCode("// just a comment");
+    // Should not have `return` on its own line (bare return or return of comment)
+    expect(result).not.toMatch(/^\s*return\s*$/m);
+    expect(result).not.toContain("return (// just a comment)");
+  });
+
+  test("whitespace-only code does not return meaningful content", () => {
+    const result = transformCellCode("   \n  \n   ");
+    // Whitespace-only input should still produce an async IIFE wrapper
+    expect(result).toContain("(async () => {");
+    // Should not return any meaningful expression (no identifiers or literals)
+    expect(result).not.toMatch(/return \(\s*\S+\s*\)/);
+  });
+
+  test("string containing import keyword is not transformed as import", () => {
+    const result = transformCellCode('const s = "import foo from bar"');
+    // The string literal should survive untouched
+    expect(result).toContain('"import foo from bar"');
+    // Should NOT have turned the string into an actual dynamic import
+    expect(result).not.toContain("await import(");
+  });
+
+  test("empty string does not crash", () => {
+    expect(() => transformCellCode("")).not.toThrow();
+    const result = transformCellCode("");
+    expect(result).toContain("(async () => {");
+  });
 });
 
 describe("TypeScript transpilation", () => {

@@ -113,4 +113,43 @@ describe("executeCode", () => {
     expect(result.error!.ename).toBe("ReferenceError");
     expect(result.error!.traceback.length).toBeGreaterThan(0);
   });
+
+  test("console.warn output goes to stderr", async () => {
+    const result = await executeCode('console.warn("warning msg")', {});
+    expect(result.stderr).toContain("warning msg");
+  });
+
+  test("console.table with array of objects populates tables", async () => {
+    const result = await executeCode("console.table([{a:1},{a:2}])", {});
+    expect(Array.isArray(result.tables)).toBe(true);
+    expect(result.tables).toHaveLength(2);
+  });
+
+  test("TypeScript generics in function return correct value", async () => {
+    const result = await executeCode(`
+      function typed<T>(v: T): T { return v }
+      typed<number>(42)
+    `, {});
+    expect(result.error).toBeUndefined();
+    expect(result.value).toBe(42);
+  });
+
+  test("thrown error has traceback array with length > 0", async () => {
+    const result = await executeCode('throw new Error("test")', {});
+    expect(result.error).toBeDefined();
+    expect(Array.isArray(result.error!.traceback)).toBe(true);
+    expect(result.error!.traceback.length).toBeGreaterThan(0);
+  });
+
+  test("console.log without return expression leaves value undefined", async () => {
+    const result = await executeCode('console.log("hello")', {});
+    expect(result.value).toBeUndefined();
+  });
+
+  test("awaited empty-string promise has undefined value", async () => {
+    const result = await executeCode('await Promise.resolve("")', {});
+    // Empty string is falsy but defined — value should be empty string
+    expect(result.error).toBeUndefined();
+    expect(result.value).toBe("");
+  });
 });

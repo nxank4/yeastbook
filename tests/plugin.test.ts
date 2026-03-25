@@ -55,4 +55,29 @@ describe("PluginLoader", () => {
     await loader.loadAll();
     expect(loader.getPlugins()).toHaveLength(0);
   });
+
+  test("registerPlugin with invalid object does not add to plugins", () => {
+    const loader = new PluginLoader(tempDir);
+    loader.registerPlugin({ invalid: true } as any);
+    expect(loader.getPlugins()).toHaveLength(0);
+  });
+
+  test("registerPlugin with valid plugin adds to plugins", () => {
+    const loader = new PluginLoader(tempDir);
+    loader.registerPlugin({ name: "test", version: "1.0", renderers: [] });
+    expect(loader.getPlugins()).toHaveLength(1);
+  });
+
+  test("two plugins each with 1 renderer gives getRenderers().length === 2", () => {
+    const loader = new PluginLoader(tempDir);
+    const makeRenderer = (type: string) => ({
+      type,
+      displayName: type,
+      canRender: (_v: unknown) => false,
+      serialize: (_v: unknown) => ({}),
+    });
+    loader.registerPlugin({ name: "plugin-a", version: "1.0", renderers: [makeRenderer("type-a")] });
+    loader.registerPlugin({ name: "plugin-b", version: "1.0", renderers: [makeRenderer("type-b")] });
+    expect(loader.getRenderers()).toHaveLength(2);
+  });
 });

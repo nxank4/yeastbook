@@ -80,4 +80,28 @@ describe("detectOutputType", () => {
     const result = detectOutputType([null, { a: 1 }]);
     expect(result).toEqual({ type: "json", data: [null, { a: 1 }] });
   });
+
+  test("widget marker object returns widget type", () => {
+    const val = { __type: "widget", __widgetId: "w1", __widgetType: "slider", value: 50, __config: {} };
+    const result = detectOutputType(val);
+    expect((result as any)!.type).toBe("widget");
+  });
+
+  test("math marker object returns math type", () => {
+    const val = { __type: "math", latex: "E=mc^2" };
+    const result = detectOutputType(val);
+    expect((result as any)!.type).toBe("math");
+  });
+
+  test("vega marker object returns vega type", () => {
+    const val = { __type: "vega", spec: { $schema: "https://vega.github.io/schema/vega-lite/v5.json" } };
+    const result = detectOutputType(val);
+    expect((result as any)!.type).toBe("vega");
+  });
+
+  test("dataframe marker object returns dataframe type", () => {
+    const val = { __type: "dataframe", columns: ["a"], data: [[1]], shape: [1, 1] };
+    const result = detectOutputType(val);
+    expect((result as any)!.type).toBe("dataframe");
+  });
 });

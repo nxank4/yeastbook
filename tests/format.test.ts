@@ -1,5 +1,7 @@
 import { test, expect, describe, afterEach } from "bun:test";
-import { unlink } from "node:fs/promises";
+import { unlink, mkdtemp, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import {
   ybkToIpynb,
   ipynbToYbk,
@@ -197,5 +199,53 @@ describe("loadNotebook / saveNotebook", () => {
     expect(notebook.cells.length).toBe(2);
     expect(notebook.cells[0]!.type).toBe("code");
     expect(notebook.cells[0]!.source).toBe("const x = 1 + 1");
+  });
+});
+
+describe("format edge cases", () => {
+  test("round-trip: ipynbToYbk(ybkToIpynb(ybk)) preserves cell sources", () => {
+    const ybk = makeYbk();
+    const roundTripped = ipynbToYbk(ybkToIpynb(ybk));
+    expect(roundTripped.cells.length).toBe(ybk.cells.length);
+    for (let i = 0; i < ybk.cells.length; i++) {
+      expect(roundTripped.cells[i]!.source).toBe(ybk.cells[i]!.source);
+    }
+  });
+
+  test("ipynbToYbk handles cell.source as single string", () => {
+    const ipynb = makeIpynb();
+    // Force source to a plain string (not an array)
+    (ipynb.cells[0] as any).source = "hello";
+    const ybk = ipynbToYbk(ipynb);
+    expect(ybk.cells[0]!.source).toBe("hello");
+  });
+
+  test("detectFormat handles uppercase .YBK extension", () => {
+    expect(detectFormat("test.YBK")).toBe("ybk");
+  });
+
+  test("detectFormat returns ipynb for .json", () => {
+    expect(detectFormat("test.json")).toBe("ipynb");
+  });
+
+  test("loadNotebook with malformed JSON throws", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "yeastbook-test-"));
+    const badFile = join(dir, "bad.ybk");
+    await writeFile(badFile, "{invalid json");
+    let threw = false;
+    try {
+      await loadNotebook(badFile);
+    } catch {
+      threw = true;
+    } finally {
+      try { await unlink(badFile); } catch {}
+    }
+    expect(threw).toBe(true);
+  });
+
+  test("createEmptyYbk returns version 0.1.0 and empty cells", () => {
+    const ybk = createEmptyYbk();
+    expect(ybk.version).toBe("0.1.0");
+    expect(ybk.cells).toEqual([]);
   });
 });

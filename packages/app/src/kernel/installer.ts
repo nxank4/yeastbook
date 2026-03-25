@@ -8,6 +8,12 @@ export interface InstallResult {
   versions?: Record<string, string>;
 }
 
+const VALID_PKG = /^(@[\w-]+\/)?[\w][\w.\-]*(@[\w.\-^~>=<*]+)?$/;
+
+export function validatePackageName(name: string): boolean {
+  return VALID_PKG.test(name);
+}
+
 export async function installPackages(
   packages: string[],
   onOutput: (text: string, stream: "stdout" | "stderr") => void,
@@ -16,10 +22,8 @@ export async function installPackages(
     return { success: false, error: "No packages specified" };
   }
 
-  // Validate package names to prevent command injection
-  const VALID_PKG = /^(@[\w-]+\/)?[\w][\w.\-]*(@[\w.\-^~>=<*]+)?$/;
   for (const pkg of packages) {
-    if (!VALID_PKG.test(pkg)) {
+    if (!validatePackageName(pkg)) {
       return { success: false, error: `Invalid package name: ${pkg}` };
     }
   }

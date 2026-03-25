@@ -12,68 +12,8 @@ import type { IpynbNotebook } from "@codepawl/yeastbook-core";
 import { diffNotebook, diffText } from "./diff.ts";
 import { exportToScript, stripOutputs } from "./exporter.ts";
 import { templates } from "./templates.ts";
-
-// ---------------------------------------------------------------------------
-// Flag parsing
-// ---------------------------------------------------------------------------
-
-interface ParsedArgs {
-  positional: string[];
-  port: number;
-  noOpen: boolean;
-  ipynb: boolean;
-  dev: boolean;
-  template: string | null;
-  dir: string | null;
-}
-
-function parseFlags(argv: string[]): ParsedArgs {
-  const positional: string[] = [];
-  let port = parseInt(process.env.PORT ?? "3000", 10);
-  let noOpen = false;
-  let ipynb = false;
-  let dev = false;
-  let template: string | null = null;
-  let dir: string | null = null;
-
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg === "--port") {
-      const next = argv[i + 1];
-      if (next !== undefined && !next.startsWith("-")) {
-        port = parseInt(next, 10);
-        i++;
-      } else {
-        console.error("Error: --port requires a numeric argument.");
-        process.exit(1);
-      }
-    } else if (arg!.startsWith("--port=")) {
-      port = parseInt(arg!.slice("--port=".length), 10);
-    } else if (arg === "--no-open") {
-      noOpen = true;
-    } else if (arg === "--ipynb") {
-      ipynb = true;
-    } else if (arg === "--dev") {
-      dev = true;
-    } else if (arg === "--template") {
-      const next = argv[i + 1];
-      if (next !== undefined && !next.startsWith("-")) {
-        template = next;
-        i++;
-      }
-    } else if (arg === "--dir") {
-      const next = argv[i + 1];
-      if (next !== undefined && !next.startsWith("-")) {
-        dir = next;
-        i++;
-      }
-    } else {
-      positional.push(arg!);
-    }
-  }
-
-  return { positional, port, noOpen, ipynb, dev, template, dir };
-}
+import { parseFlags } from "./parse-flags.ts";
+import type { ParsedArgs } from "./parse-flags.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers

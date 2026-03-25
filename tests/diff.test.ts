@@ -92,4 +92,53 @@ describe("notebook diff", () => {
     expect(changes.modified).toBe(0);
     expect(changes.deleted).toBe(0);
   });
+
+  test("old with 3 cells, new with 0 cells => deleted: 3", () => {
+    const old = {
+      cells: [
+        { id: "1", type: "code" as const, source: "a = 1", outputs: [] },
+        { id: "2", type: "code" as const, source: "b = 2", outputs: [] },
+        { id: "3", type: "code" as const, source: "c = 3", outputs: [] },
+      ],
+    };
+    const empty = { cells: [] as any[] };
+    const changes = computeDiff(old, empty);
+    expect(changes.deleted).toBe(3);
+    expect(changes.added).toBe(0);
+    expect(changes.modified).toBe(0);
+  });
+
+  test("same source but different outputs is NOT counted as modified", () => {
+    const old = {
+      cells: [{ id: "1", type: "code" as const, source: "x = 1", outputs: [{ data: "old" }] }],
+    };
+    const newer = {
+      cells: [{ id: "1", type: "code" as const, source: "x = 1", outputs: [] }],
+    };
+    const changes = computeDiff(old, newer);
+    expect(changes.modified).toBe(0);
+    expect(changes.added).toBe(0);
+    expect(changes.deleted).toBe(0);
+  });
+
+  test("one cell source changed, others same => modified: 1", () => {
+    const old = {
+      cells: [
+        { id: "1", type: "code" as const, source: "a = 1", outputs: [] },
+        { id: "2", type: "code" as const, source: "b = 2", outputs: [] },
+        { id: "3", type: "code" as const, source: "c = 3", outputs: [] },
+      ],
+    };
+    const newer = {
+      cells: [
+        { id: "1", type: "code" as const, source: "a = 1", outputs: [] },
+        { id: "2", type: "code" as const, source: "b = 99", outputs: [] },
+        { id: "3", type: "code" as const, source: "c = 3", outputs: [] },
+      ],
+    };
+    const changes = computeDiff(old, newer);
+    expect(changes.modified).toBe(1);
+    expect(changes.added).toBe(0);
+    expect(changes.deleted).toBe(0);
+  });
 });

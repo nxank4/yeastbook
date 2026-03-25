@@ -39,4 +39,23 @@ describe("widgets", () => {
     w._callbacks[0]!(75);
     expect(received).toBe(75);
   });
+
+  test("createSlider defaults value to min when value not provided", () => {
+    const w = createSlider({ min: 5, max: 10 });
+    expect(w.value).toBe(5);
+  });
+
+  test("createSelect defaults value to first option when value not provided", () => {
+    const w = createSelect({ options: ["a", "b", "c"] });
+    expect(w.value).toBe("a");
+  });
+
+  test("destroy clears all onChange callbacks", () => {
+    const w = createSlider({ min: 0, max: 100 });
+    w.onChange(() => {});
+    w.onChange(() => {});
+    expect(w._callbacks.length).toBe(2);
+    w.destroy();
+    expect(w._callbacks.length).toBe(0);
+  });
 });
